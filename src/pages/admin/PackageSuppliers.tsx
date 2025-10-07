@@ -53,6 +53,8 @@ export default function PackageSuppliers() {
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [supplierToDelete, setSupplierToDelete] = useState<PackageSupplier | null>(null);
 
   const { toast } = useToast();
   const { token } = useAuth();
@@ -121,20 +123,27 @@ export default function PackageSuppliers() {
       setSubmitting(false);
     }
   };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this supplier?")) return;
+ const confirmDelete = (supplier: PackageSupplier) => {
+    setSupplierToDelete(supplier);
+    setIsDeleteDialogOpen(true);
+  };
+ const handleDeleteConfirmed = async () => {
+    if (!supplierToDelete) return;
     try {
-      const res = await fetch(`${API_BASE}/${id}`, {
+      const res = await fetch(`${API_BASE}/${supplierToDelete._id}`, {
         method: "DELETE",
         headers: { Authorization: "Bearer " + token },
       });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.message || "Failed to delete supplier");
+
       toast({ title: "Supplier deleted successfully" });
       fetchSuppliers();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setSupplierToDelete(null);
     }
   };
 
@@ -252,7 +261,7 @@ export default function PackageSuppliers() {
                     <Button size="sm" variant="ghost" onClick={() => openDialog(supplier)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => handleDelete(supplier._id)}>
+                    <Button size="sm" variant="ghost" onClick={() => confirmDelete(supplier)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -395,6 +404,30 @@ export default function PackageSuppliers() {
             <Button onClick={handleSubmit} disabled={submitting}>
               {submitting ? "Saving..." : editingSupplier ? "Update" : "Add"} Supplier
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+       {/* 🔻 Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Supplier</DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground">
+            Are you sure you want to delete{" "}
+            <span className="font-semibold">{supplierToDelete?.name}</span>? This action cannot be undone.
+          </p>
+          <DialogFooter className="mt-4 flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteConfirmed}
+            >
+              Delete
+            </Button>
+        
           </DialogFooter>
         </DialogContent>
       </Dialog>
