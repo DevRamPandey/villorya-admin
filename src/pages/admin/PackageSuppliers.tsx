@@ -40,6 +40,10 @@ interface PackageSupplier {
   status: "active" | "inactive" | "pending";
   minOrderValue: number;
   pricePerUnit: number;
+  minOrderWeight: number; // NEW
+  pricePerKg: number; // NEW
+  location: string; // NEW
+  website: string; // NEW
 }
 
 export default function PackageSuppliers() {
@@ -51,7 +55,7 @@ export default function PackageSuppliers() {
   const [submitting, setSubmitting] = useState(false);
 
   const { toast } = useToast();
-  const { token } = useAuth(); // Assuming your auth hook returns token
+  const { token } = useAuth();
 
   const [formData, setFormData] = useState<Omit<PackageSupplier, "_id">>({
     name: "",
@@ -62,11 +66,14 @@ export default function PackageSuppliers() {
     status: "active",
     minOrderValue: 0,
     pricePerUnit: 0,
+    minOrderWeight: 0, // NEW
+    pricePerKg: 0, // NEW
+    location: "", // NEW
+    website: "", // NEW
   });
 
   const API_BASE = "https://villorya-server.vercel.app/api/v1/package-suppliers";
 
-  // Fetch all suppliers
   const fetchSuppliers = async () => {
     setLoading(true);
     try {
@@ -146,6 +153,10 @@ export default function PackageSuppliers() {
         status: "active",
         minOrderValue: 0,
         pricePerUnit: 0,
+        minOrderWeight: 0,
+        pricePerKg: 0,
+        location: "",
+        website: "",
       });
     }
     setIsDialogOpen(true);
@@ -192,9 +203,13 @@ export default function PackageSuppliers() {
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Phone</TableHead>
+              <TableHead>Location</TableHead>
+              <TableHead>Website</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Min Order</TableHead>
               <TableHead>Price/Unit</TableHead>
+              <TableHead>Min Weight</TableHead>
+              <TableHead>Price/Kg</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -204,6 +219,17 @@ export default function PackageSuppliers() {
                 <TableCell className="font-medium">{supplier.name}</TableCell>
                 <TableCell>{supplier.email}</TableCell>
                 <TableCell>{supplier.phone}</TableCell>
+                <TableCell>{supplier.location}</TableCell>
+                <TableCell>
+                  <a
+                    href={supplier.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 underline"
+                  >
+                    {supplier.website}
+                  </a>
+                </TableCell>
                 <TableCell>
                   <span
                     className={`px-2 py-1 rounded-full text-xs ${
@@ -219,6 +245,8 @@ export default function PackageSuppliers() {
                 </TableCell>
                 <TableCell>${supplier.minOrderValue}</TableCell>
                 <TableCell>${supplier.pricePerUnit}</TableCell>
+                <TableCell>{supplier.minOrderWeight} kg</TableCell>
+                <TableCell>${supplier.pricePerKg}</TableCell>
                 <TableCell>
                   <div className="flex gap-2">
                     <Button size="sm" variant="ghost" onClick={() => openDialog(supplier)}>
@@ -265,6 +293,24 @@ export default function PackageSuppliers() {
                   id="phone"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="location">Location</Label>
+                <Input
+                  id="location"
+                  value={formData.location}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="website">Website</Label>
+                <Input
+                  id="website"
+                  value={formData.website}
+                  onChange={(e) => setFormData({ ...formData, website: e.target.value })}
                 />
               </div>
             </div>
@@ -317,6 +363,27 @@ export default function PackageSuppliers() {
                   type="number"
                   value={formData.pricePerUnit}
                   onChange={(e) => setFormData({ ...formData, pricePerUnit: Number(e.target.value) })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="minOrderWeight">Min Order Weight (kg)</Label>
+                <Input
+                  id="minOrderWeight"
+                  type="number"
+                  value={formData.minOrderWeight}
+                  onChange={(e) => setFormData({ ...formData, minOrderWeight: Number(e.target.value) })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="pricePerKg">Price Per Kg</Label>
+                <Input
+                  id="pricePerKg"
+                  type="number"
+                  value={formData.pricePerKg}
+                  onChange={(e) => setFormData({ ...formData, pricePerKg: Number(e.target.value) })}
                 />
               </div>
             </div>
