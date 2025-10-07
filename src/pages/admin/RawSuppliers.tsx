@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import axios from "axios";
 import { Plus, Pencil, Trash2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,9 +29,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 
 interface RawSupplier {
-  id: string;
+  _id: string; // use _id from MongoDB
   name: string;
   email: string;
   phone: string;
@@ -46,9 +48,10 @@ export default function RawSuppliers() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<RawSupplier | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-
-  const [formData, setFormData] = useState<Omit<RawSupplier, "id">>({
+const { token } = useAuth();
+  const [formData, setFormData] = useState<Omit<RawSupplier, "_id">>({
     name: "",
     email: "",
     phone: "",
@@ -59,38 +62,69 @@ export default function RawSuppliers() {
     pricePerGram: 0,
   });
 
-  useEffect(() => {
-    const stored = localStorage.getItem("rawSuppliers");
-    if (stored) {
-      setSuppliers(JSON.parse(stored));
-    }
-  }, []);
+  const API_URL = "https://villorya-server.vercel.app/api/v1/raw-suppliers";
 
-  const saveSuppliers = (data: RawSupplier[]) => {
-    localStorage.setItem("rawSuppliers", JSON.stringify(data));
-    setSuppliers(data);
-  };
+const axiosConfig = {
+  headers: {
+    Authorization: `Bearer ${token}`,
+  },
+};
 
-  const handleSubmit = () => {
+const fetchSuppliers = async () => {
+  try {
+    setLoading(true);
+    const res = await axios.get(API_URL, axiosConfig);
+    setSuppliers(res.data.data);
+  } catch (error: any) {
+    toast({ title: "Failed to load suppliers", description: error.message, variant: "destructive" });
+  } finally {
+    setLoading(false);
+  }
+};
+
+const handleSubmit = async () => {
+  try {
+    setLoading(true);
     if (editingSupplier) {
-      const updated = suppliers.map((s) =>
-        s.id === editingSupplier.id ? { ...formData, id: s.id } : s
+      const res = await axios.put(`${API_URL}/${editingSupplier._id}`, formData, axiosConfig);
+      setSuppliers((prev) =>
+        prev.map((s) => (s._id === editingSupplier._id ? res.data.data : s))
       );
-      saveSuppliers(updated);
       toast({ title: "Supplier updated successfully" });
     } else {
-      const newSupplier = { ...formData, id: Date.now().toString() };
-      saveSuppliers([...suppliers, newSupplier]);
+      const res = await axios.post(API_URL, formData, axiosConfig);
+      setSuppliers((prev) => [res.data.data, ...prev]);
       toast({ title: "Supplier added successfully" });
     }
     closeDialog();
-  };
+  } catch (error: any) {
+    toast({ title: "Operation failed", description: error.message, variant: "destructive" });
+  } finally {
+    setLoading(false);
+  }
+};
 
-  const handleDelete = (id: string) => {
-    saveSuppliers(suppliers.filter((s) => s.id !== id));
+const handleDelete = async (_id: string) => {
+  try {
+    setLoading(true);
+    await axios.delete(`${API_URL}/${_id}`, axiosConfig);
+    setSuppliers((prev) => prev.filter((s) => s._id !== _id));
     toast({ title: "Supplier deleted successfully" });
-  };
+  } catch (error: any) {
+    toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+  } finally {
+    setLoading(false);
+  }
+};
 
+
+  useEffect(() => {
+    fetchSuppliers();
+  }, []);
+
+
+
+ 
   const openDialog = (supplier?: RawSupplier) => {
     if (supplier) {
       setEditingSupplier(supplier);
@@ -131,7 +165,7 @@ export default function RawSuppliers() {
             Manage your raw material suppliers
           </p>
         </div>
-        <Button onClick={() => openDialog()} className="gap-2">
+        <Button onClick={() => openDialog()} className="gap-2" disabled={loading}>
           <Plus className="h-4 w-4" />
           Add Supplier
         </Button>
@@ -148,61 +182,67 @@ export default function RawSuppliers() {
           />
         </div>
 
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Phone</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Min Order</TableHead>
-              <TableHead>Price/Gram</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredSuppliers.map((supplier) => (
-              <TableRow key={supplier.id}>
-                <TableCell className="font-medium">{supplier.name}</TableCell>
-                <TableCell>{supplier.email}</TableCell>
-                <TableCell>{supplier.phone}</TableCell>
-                <TableCell>
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs ${
-                      supplier.status === "active"
-                        ? "bg-green-500/20 text-green-500"
-                        : supplier.status === "inactive"
-                        ? "bg-red-500/20 text-red-500"
-                        : "bg-yellow-500/20 text-yellow-500"
-                    }`}
-                  >
-                    {supplier.status}
-                  </span>
-                </TableCell>
-                <TableCell>${supplier.minOrderValue}</TableCell>
-                <TableCell>${supplier.pricePerGram}</TableCell>
-                <TableCell>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => openDialog(supplier)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleDelete(supplier.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </TableCell>
+        {loading ? (
+          <p>Loading suppliers...</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Min Order</TableHead>
+                <TableHead>Price/Gram</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {filteredSuppliers.map((supplier) => (
+                <TableRow key={supplier._id}>
+                  <TableCell className="font-medium">{supplier.name}</TableCell>
+                  <TableCell>{supplier.email}</TableCell>
+                  <TableCell>{supplier.phone}</TableCell>
+                  <TableCell>
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs ${
+                        supplier.status === "active"
+                          ? "bg-green-500/20 text-green-500"
+                          : supplier.status === "inactive"
+                          ? "bg-red-500/20 text-red-500"
+                          : "bg-yellow-500/20 text-yellow-500"
+                      }`}
+                    >
+                      {supplier.status}
+                    </span>
+                  </TableCell>
+                  <TableCell>${supplier.minOrderValue}</TableCell>
+                  <TableCell>${supplier.pricePerGram}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => openDialog(supplier)}
+                        disabled={loading}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleDelete(supplier._id)}
+                        disabled={loading}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -320,10 +360,10 @@ export default function RawSuppliers() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={closeDialog}>
+            <Button variant="outline" onClick={closeDialog} disabled={loading}>
               Cancel
             </Button>
-            <Button onClick={handleSubmit}>
+            <Button onClick={handleSubmit} disabled={loading}>
               {editingSupplier ? "Update" : "Add"} Supplier
             </Button>
           </DialogFooter>
