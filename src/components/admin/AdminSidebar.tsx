@@ -7,6 +7,7 @@ import {
   HelpCircle,
   Menu,
   Box,
+  FlaskConical,
 } from "lucide-react";
 import {
   Sidebar,
@@ -50,6 +51,11 @@ const menuItems = [
     title: "Supplier Questions",
     icon: HelpCircle,
     url: "/admin/questions",
+  },
+  {
+    title: "R&D",
+    icon: FlaskConical,
+    url: "/admin/rd",
   },
 ];
 
