@@ -62,6 +62,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { Download, ArrowUpDown } from "lucide-react";
 
 interface PackageSupplier {
   _id: string;
@@ -92,6 +93,7 @@ export default function PackageSuppliers() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [supplierToDelete, setSupplierToDelete] =
     useState<PackageSupplier | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: keyof PackageSupplier; direction: "asc" | "desc" } | null>(null);
 
   const { toast } = useToast();
   const { token } = useAuth();
@@ -105,10 +107,10 @@ export default function PackageSuppliers() {
     status: "active",
     minOrderValue: 0,
     pricePerUnit: 0,
-    minOrderWeight: 0, // NEW
-    pricePerKg: 0, // NEW
-    location: "", // NEW
-    website: "", // NEW
+    minOrderWeight: 0,
+    pricePerKg: 0,
+    location: "",
+    website: "",
   });
 
   const today = new Date();
@@ -251,9 +253,53 @@ export default function PackageSuppliers() {
     setEditingSupplier(null);
   };
 
-  const filteredSuppliers = suppliers.filter((s) =>
-    s.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredSuppliers = suppliers
+    .filter((s) =>
+      s.name.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (!sortConfig) return 0;
+      const { key, direction } = sortConfig;
+      const order = direction === "asc" ? 1 : -1;
+      if (typeof a[key] === "number" && typeof b[key] === "number") {
+        return (a[key] as number) > (b[key] as number) ? order : -order;
+      }
+      return String(a[key]).localeCompare(String(b[key])) * order;
+    });
+
+  const downloadCSV = () => {
+    const headers = [
+      "Name,Email,Phone,Location,Website,Status,MinOrderValue,PricePerUnit,MinOrderWeight,PricePerKg,Note,ProductDescription",
+    ];
+    const rows = suppliers.map((s) =>
+      [
+        s.name,
+        s.email,
+        s.phone,
+        s.location,
+        s.website,
+        s.status,
+        s.minOrderValue,
+        s.pricePerUnit,
+        s.minOrderWeight,
+        s.pricePerKg,
+        s.note,
+        s.productDescription,
+      ]
+        .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+        .join(",")
+    );
+    const csvContent = headers.concat(rows).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "package_suppliers.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
 
   // Analytics data
   const statusData = [
@@ -314,12 +360,12 @@ export default function PackageSuppliers() {
     suppliers
       .filter((s) => s.pricePerKg > 0)
       .reduce((sum, s) => sum + s.pricePerKg, 0) /
-      suppliers.filter((s) => s.pricePerKg > 0).length || 0;
+    suppliers.filter((s) => s.pricePerKg > 0).length || 0;
   const avgMinOrderWeight =
     suppliers
       .filter((s) => s.minOrderWeight > 0)
       .reduce((sum, s) => sum + s.minOrderWeight, 0) /
-      suppliers.filter((s) => s.minOrderWeight > 0).length || 0;
+    suppliers.filter((s) => s.minOrderWeight > 0).length || 0;
 
   if (loading)
     return (
@@ -330,15 +376,19 @@ export default function PackageSuppliers() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight mb-2">
-            Package Suppliers
-          </h1>
+          <h1 className="text-4xl font-bold tracking-tight mb-2">Package Suppliers</h1>
           <p className="text-muted-foreground">Manage your package suppliers</p>
         </div>
-        <Button onClick={() => openDialog()} className="gap-2">
-          <Plus className="h-4 w-4" /> Add Supplier
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={downloadCSV} variant="outline" className="gap-2">
+            <Download className="h-4 w-4" /> Download CSV
+          </Button>
+          <Button onClick={() => openDialog()} className="gap-2">
+            <Plus className="h-4 w-4" /> Add Supplier
+          </Button>
+        </div>
       </div>
+
 
       {/* Analytics Dashboard */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
@@ -529,16 +579,35 @@ export default function PackageSuppliers() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Phone</TableHead>
-              <TableHead>Location</TableHead>
-              <TableHead>Website</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Min Order</TableHead>
-              <TableHead>Price/Unit</TableHead>
-              <TableHead>Min Weight</TableHead>
-              <TableHead>Price/Kg</TableHead>
+              {[
+                "name",
+                "email",
+                "phone",
+                "location",
+                "website",
+                "status",
+                "minOrderValue",
+                "pricePerUnit",
+                "minOrderWeight",
+                "pricePerKg",
+              ].map((key) => (
+                <TableHead
+                  key={key}
+                  className="cursor-pointer select-none"
+                  onClick={() => {
+                    setSortConfig((prev) =>
+                      prev?.key === key
+                        ? { key: key as keyof PackageSupplier, direction: prev.direction === "asc" ? "desc" : "asc" }
+                        : { key: key as keyof PackageSupplier, direction: "asc" }
+                    );
+                  }}
+                >
+                  <div className="flex items-center gap-1">
+                    {key.charAt(0).toUpperCase() + key.slice(1)}
+                    <ArrowUpDown className="h-3 w-3 opacity-60" />
+                  </div>
+                </TableHead>
+              ))}
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -563,13 +632,12 @@ export default function PackageSuppliers() {
                 </TableCell>
                 <TableCell>
                   <span
-                    className={`px-2 py-1 rounded-full text-xs ${
-                      supplier.status === "active"
-                        ? "bg-green-500/20 text-green-500"
-                        : supplier.status === "inactive"
+                    className={`px-2 py-1 rounded-full text-xs ${supplier.status === "active"
+                      ? "bg-green-500/20 text-green-500"
+                      : supplier.status === "inactive"
                         ? "bg-red-500/20 text-red-500"
                         : "bg-yellow-500/20 text-yellow-500"
-                    }`}
+                      }`}
                   >
                     {supplier.status}
                   </span>
