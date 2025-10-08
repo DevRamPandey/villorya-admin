@@ -184,9 +184,9 @@ export default function PackageSuppliers() {
 
   // Analytics data
   const statusData = [
-    { name: "Active", value: suppliers.filter(s => s.status === "active").length, color: "hsl(var(--chart-1))" },
-    { name: "Inactive", value: suppliers.filter(s => s.status === "inactive").length, color: "hsl(var(--chart-2))" },
-    { name: "Pending", value: suppliers.filter(s => s.status === "pending").length, color: "hsl(var(--chart-3))" },
+    { name: "Active", value: suppliers.filter(s => s.status === "active").length, color: "#adfccaff" },
+    { name: "Inactive", value: suppliers.filter(s => s.status === "inactive").length, color: "#fb8686ff" },
+    { name: "Pending", value: suppliers.filter(s => s.status === "pending").length, color: "#000000ff" },
   ];
 
   const locationData = suppliers.reduce((acc, supplier) => {
