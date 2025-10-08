@@ -32,7 +32,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 
 interface RawSupplier {
-  _id: string; // use _id from MongoDB
+  _id: string;
   name: string;
   email: string;
   phone: string;
@@ -41,16 +41,21 @@ interface RawSupplier {
   status: "active" | "inactive" | "pending";
   minOrderValue: number;
   pricePerGram: number;
+  website: string;
+  productName: string;
+  location: string;
 }
 
 export default function RawSuppliers() {
   const [suppliers, setSuppliers] = useState<RawSupplier[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingSupplier, setEditingSupplier] = useState<RawSupplier | null>(null);
+  const [editingSupplier, setEditingSupplier] = useState<RawSupplier | null>(
+    null
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-const { token } = useAuth();
+  const { token } = useAuth();
   const [formData, setFormData] = useState<Omit<RawSupplier, "_id">>({
     name: "",
     email: "",
@@ -60,71 +65,85 @@ const { token } = useAuth();
     status: "active",
     minOrderValue: 0,
     pricePerGram: 0,
+    website: "",
+    productName: "",
+    location: "",
   });
-
   const API_URL = "https://villorya-server.vercel.app/api/v1/raw-suppliers";
 
-const axiosConfig = {
-  headers: {
-    Authorization: `Bearer ${token}`,
-  },
-};
+  const axiosConfig = {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  };
 
-const fetchSuppliers = async () => {
-  try {
-    setLoading(true);
-    const res = await axios.get(API_URL, axiosConfig);
-    setSuppliers(res.data.data);
-  } catch (error: any) {
-    toast({ title: "Failed to load suppliers", description: error.message, variant: "destructive" });
-  } finally {
-    setLoading(false);
-  }
-};
-
-const handleSubmit = async () => {
-  try {
-    setLoading(true);
-    if (editingSupplier) {
-      const res = await axios.put(`${API_URL}/${editingSupplier._id}`, formData, axiosConfig);
-      setSuppliers((prev) =>
-        prev.map((s) => (s._id === editingSupplier._id ? res.data.data : s))
-      );
-      toast({ title: "Supplier updated successfully" });
-    } else {
-      const res = await axios.post(API_URL, formData, axiosConfig);
-      setSuppliers((prev) => [res.data.data, ...prev]);
-      toast({ title: "Supplier added successfully" });
+  const fetchSuppliers = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(API_URL, axiosConfig);
+      setSuppliers(res.data.data);
+    } catch (error: any) {
+      toast({
+        title: "Failed to load suppliers",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
-    closeDialog();
-  } catch (error: any) {
-    toast({ title: "Operation failed", description: error.message, variant: "destructive" });
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
-const handleDelete = async (_id: string) => {
-  try {
-    setLoading(true);
-    await axios.delete(`${API_URL}/${_id}`, axiosConfig);
-    setSuppliers((prev) => prev.filter((s) => s._id !== _id));
-    toast({ title: "Supplier deleted successfully" });
-  } catch (error: any) {
-    toast({ title: "Delete failed", description: error.message, variant: "destructive" });
-  } finally {
-    setLoading(false);
-  }
-};
+  const handleSubmit = async () => {
+    try {
+      setLoading(true);
+      if (editingSupplier) {
+        const res = await axios.put(
+          `${API_URL}/${editingSupplier._id}`,
+          formData,
+          axiosConfig
+        );
+        setSuppliers((prev) =>
+          prev.map((s) => (s._id === editingSupplier._id ? res.data.data : s))
+        );
+        toast({ title: "Supplier updated successfully" });
+      } else {
+        const res = await axios.post(API_URL, formData, axiosConfig);
+        setSuppliers((prev) => [res.data.data, ...prev]);
+        toast({ title: "Supplier added successfully" });
+      }
+      closeDialog();
+    } catch (error: any) {
+      toast({
+        title: "Operation failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  const handleDelete = async (_id: string) => {
+    try {
+      setLoading(true);
+      await axios.delete(`${API_URL}/${_id}`, axiosConfig);
+      setSuppliers((prev) => prev.filter((s) => s._id !== _id));
+      toast({ title: "Supplier deleted successfully" });
+    } catch (error: any) {
+      toast({
+        title: "Delete failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchSuppliers();
   }, []);
 
-
-
- 
   const openDialog = (supplier?: RawSupplier) => {
     if (supplier) {
       setEditingSupplier(supplier);
@@ -140,6 +159,9 @@ const handleDelete = async (_id: string) => {
         status: "active",
         minOrderValue: 0,
         pricePerGram: 0,
+        website: "",
+        productName: "",
+        location: "",
       });
     }
     setIsDialogOpen(true);
@@ -165,7 +187,11 @@ const handleDelete = async (_id: string) => {
             Manage your raw material suppliers
           </p>
         </div>
-        <Button onClick={() => openDialog()} className="gap-2" disabled={loading}>
+        <Button
+          onClick={() => openDialog()}
+          className="gap-2"
+          disabled={loading}
+        >
           <Plus className="h-4 w-4" />
           Add Supplier
         </Button>
@@ -191,6 +217,9 @@ const handleDelete = async (_id: string) => {
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Phone</TableHead>
+                <TableHead>Product Name</TableHead>
+                <TableHead>Website</TableHead>
+                <TableHead>Location</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Min Order</TableHead>
                 <TableHead>Price/Gram</TableHead>
@@ -203,6 +232,14 @@ const handleDelete = async (_id: string) => {
                   <TableCell className="font-medium">{supplier.name}</TableCell>
                   <TableCell>{supplier.email}</TableCell>
                   <TableCell>{supplier.phone}</TableCell>
+                  <TableCell>{supplier.productName}</TableCell>
+                  <TableCell>
+                    {supplier.website?.length > 20
+                      ? supplier.website.substring(0, 20) + "..."
+                      : supplier.website}
+                  </TableCell>
+
+                  <TableCell>{supplier.location}</TableCell>
                   <TableCell>
                     <span
                       className={`px-2 py-1 rounded-full text-xs ${
@@ -285,6 +322,39 @@ const handleDelete = async (_id: string) => {
                   }
                 />
               </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="productName">Product Name</Label>
+                <Input
+                  id="productName"
+                  value={formData.productName}
+                  onChange={(e) =>
+                    setFormData({ ...formData, productName: e.target.value })
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="website">Website</Label>
+                <Input
+                  id="website"
+                  value={formData.website}
+                  onChange={(e) =>
+                    setFormData({ ...formData, website: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="location">Location</Label>
+              <Input
+                id="location"
+                value={formData.location}
+                onChange={(e) =>
+                  setFormData({ ...formData, location: e.target.value })
+                }
+              />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="productDescription">Product Description</Label>

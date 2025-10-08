@@ -520,9 +520,9 @@ export default function PackageSuppliers() {
                     rel="noopener noreferrer"
                     className="text-blue-500 underline"
                   >
-                   {supplier.website?.length > 20
-    ? supplier.website.slice(0, 20) + "..."
-    : supplier.website}
+                    {supplier.website?.length > 20
+                      ? supplier.website.slice(0, 20) + "..."
+                      : supplier.website}
                   </a>
                 </TableCell>
                 <TableCell>
