@@ -2,16 +2,44 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, FileText, Upload, Search, Filter, Eye } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  FileText,
+  Upload,
+  Search,
+  Filter,
+  Eye,
+} from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useAuth } from "@/hooks/use-auth";
 
 interface RDVersion {
-  id: string;
+  _id: string;
   versionNumber: number;
   fileName: string;
   fileData: string;
@@ -19,7 +47,7 @@ interface RDVersion {
 }
 
 interface RDEntry {
-  id: string;
+  _id: string;
   title: string;
   description: string;
   tags: string[];
@@ -46,32 +74,192 @@ export default function RD() {
     tags: "",
     file: null as File | null,
   });
-
-  const { toast } = useToast();
-
-  useEffect(() => {
-    loadEntries();
-  }, []);
-
-  const loadEntries = () => {
-    const stored = localStorage.getItem("rd_entries");
-    if (stored) {
-      setEntries(JSON.parse(stored));
-    }
-  };
-
-  const saveEntries = (newEntries: RDEntry[]) => {
-    localStorage.setItem("rd_entries", JSON.stringify(newEntries));
-    setEntries(newEntries);
-  };
+  const [loading, setLoading] = useState(false); // global loading for button
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && file.type === "application/pdf") {
       setFormData({ ...formData, file });
     } else {
-      toast({ title: "Error", description: "Please select a PDF file", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: "Please select a PDF file",
+        variant: "destructive",
+      });
     }
+  };
+  const { toast } = useToast();
+
+  useEffect(() => {
+    loadEntries();
+  }, []);
+
+  const API_URL = "https://villorya-server.vercel.app/api/v1/rd";
+  const { token } = useAuth();
+  const getAuthHeaders = () => {
+    return {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    };
+  };
+
+  const loadEntries = async () => {
+    try {
+      const res = await fetch(API_URL, { headers: getAuthHeaders() });
+      const data = await res.json();
+      if (data.success) {
+        setEntries(data.data);
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to load entries",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Unable to connect to server",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (
+      !formData.title ||
+      !formData.description ||
+      (!formData.file && !currentEntry && !isAddingVersion)
+    ) {
+      toast({
+        title: "Error",
+        description: "Please fill all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      let fileUrl: string | null = null;
+
+      if (formData.file) {
+        fileUrl = await uploadFile(formData.file);
+      }
+
+      const payload = {
+        title: formData.title,
+        description: formData.description,
+        tags: formData.tags
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean),
+        fileName: formData.file?.name,
+        fileUrl, // use uploaded file URL
+      };
+
+      let res, data;
+      const token = localStorage.getItem("token");
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      };
+
+      if (isAddingVersion && currentEntry) {
+        res = await fetch(
+          `https://villorya-server.vercel.app/api/v1/rd/${currentEntry._id}/version`,
+          {
+            method: "POST",
+            headers,
+            body: JSON.stringify(payload),
+          }
+        );
+      } else if (currentEntry) {
+        res = await fetch(
+          `https://villorya-server.vercel.app/api/v1/rd/${currentEntry._id}`,
+          {
+            method: "PUT",
+            headers,
+            body: JSON.stringify(payload),
+          }
+        );
+      } else {
+        res = await fetch(`https://villorya-server.vercel.app/api/v1/rd`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(payload),
+        });
+      }
+
+      data = await res.json();
+      if (!data.success) throw new Error(data.message || "Operation failed");
+
+      toast({
+        title: "Success",
+        description: currentEntry
+          ? "Updated successfully"
+          : "Created successfully",
+      });
+      closeDialog();
+      loadEntries();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save R&D",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+  const handleDelete = async () => {
+    if (!entryToDelete) return;
+    try {
+      const res = await fetch(`${API_URL}/${entryToDelete._id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast({ title: "Success", description: "R&D deleted successfully" });
+        loadEntries();
+      } else {
+        throw new Error(data.message);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setEntryToDelete(null);
+    }
+  };
+
+  const uploadFile = async (file: File) => {
+    debugger;
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch("https://villorya-server.vercel.app/api/v1/rd/upload", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message || "File upload failed");
+    return data.fileUrl; 
+  };
+
+  const saveEntries = (newEntries: RDEntry[]) => {
+    localStorage.setItem("rd_entries", JSON.stringify(newEntries));
+    setEntries(newEntries);
   };
 
   const fileToBase64 = (file: File): Promise<string> => {
@@ -81,96 +269,6 @@ export default function RD() {
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = (error) => reject(error);
     });
-  };
-
-  const handleSubmit = async () => {
-    if (!formData.title || !formData.description || (!formData.file && !currentEntry && !isAddingVersion)) {
-      toast({ title: "Error", description: "Please fill all required fields", variant: "destructive" });
-      return;
-    }
-
-    try {
-      if (isAddingVersion && currentEntry) {
-        // Adding a new version
-        if (!formData.file) {
-          toast({ title: "Error", description: "Please select a PDF file", variant: "destructive" });
-          return;
-        }
-
-        const fileData = await fileToBase64(formData.file);
-        const newVersion: RDVersion = {
-          id: Date.now().toString(),
-          versionNumber: currentEntry.versions.length + 1,
-          fileName: formData.file.name,
-          fileData,
-          uploadedAt: new Date().toISOString(),
-        };
-
-        const updatedEntry = {
-          ...currentEntry,
-          versions: [...currentEntry.versions, newVersion],
-          updatedAt: new Date().toISOString(),
-        };
-
-        const updatedEntries = entries.map((e) => (e.id === currentEntry.id ? updatedEntry : e));
-        saveEntries(updatedEntries);
-        toast({ title: "Success", description: "New version added successfully" });
-      } else if (currentEntry) {
-        // Editing existing entry
-        const updatedEntry = {
-          ...currentEntry,
-          title: formData.title,
-          description: formData.description,
-          tags: formData.tags.split(",").map((t) => t.trim()).filter(Boolean),
-          updatedAt: new Date().toISOString(),
-        };
-
-        if (formData.file) {
-          const fileData = await fileToBase64(formData.file);
-          updatedEntry.versions[0] = {
-            ...updatedEntry.versions[0],
-            fileName: formData.file.name,
-            fileData,
-          };
-        }
-
-        const updatedEntries = entries.map((e) => (e.id === currentEntry.id ? updatedEntry : e));
-        saveEntries(updatedEntries);
-        toast({ title: "Success", description: "R&D updated successfully" });
-      } else {
-        // Creating new entry
-        if (!formData.file) {
-          toast({ title: "Error", description: "Please select a PDF file", variant: "destructive" });
-          return;
-        }
-
-        const fileData = await fileToBase64(formData.file);
-        const newEntry: RDEntry = {
-          id: Date.now().toString(),
-          title: formData.title,
-          description: formData.description,
-          tags: formData.tags.split(",").map((t) => t.trim()).filter(Boolean),
-          versions: [
-            {
-              id: Date.now().toString(),
-              versionNumber: 1,
-              fileName: formData.file.name,
-              fileData,
-              uploadedAt: new Date().toISOString(),
-            },
-          ],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-
-        saveEntries([...entries, newEntry]);
-        toast({ title: "Success", description: "R&D created successfully" });
-      }
-
-      closeDialog();
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to save R&D", variant: "destructive" });
-    }
   };
 
   const openDialog = (entry: RDEntry | null = null, addVersion = false) => {
@@ -201,15 +299,6 @@ export default function RD() {
     setIsDeleteDialogOpen(true);
   };
 
-  const handleDelete = () => {
-    if (!entryToDelete) return;
-    const updatedEntries = entries.filter((e) => e.id !== entryToDelete.id);
-    saveEntries(updatedEntries);
-    toast({ title: "Success", description: "R&D deleted successfully" });
-    setIsDeleteDialogOpen(false);
-    setEntryToDelete(null);
-  };
-
   const viewPdf = (fileData: string) => {
     setViewingPdf(fileData);
     setIsViewerOpen(true);
@@ -221,7 +310,9 @@ export default function RD() {
     const matchesSearch =
       entry.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       entry.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      entry.tags.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+      entry.tags.some((tag) =>
+        tag.toLowerCase().includes(searchQuery.toLowerCase())
+      );
 
     const matchesFilter = filterTag === "all" || entry.tags.includes(filterTag);
 
@@ -233,7 +324,9 @@ export default function RD() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-foreground">R&D Management</h1>
-          <p className="text-muted-foreground mt-1">Manage research and development documents</p>
+          <p className="text-muted-foreground mt-1">
+            Manage research and development documents
+          </p>
         </div>
         <Button onClick={() => openDialog()} className="gap-2">
           <Plus className="h-4 w-4" />
@@ -269,13 +362,18 @@ export default function RD() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredEntries.map((entry) => (
-          <Card key={entry.id} className="hover:shadow-lg transition-shadow">
+          <Card key={entry._id} className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle className="flex items-start justify-between">
                 <span className="line-clamp-1">{entry.title}</span>
-                <Badge variant="secondary">{entry.versions.length} version{entry.versions.length > 1 ? 's' : ''}</Badge>
+                <Badge variant="secondary">
+                  {entry.versions.length} version
+                  {entry.versions.length > 1 ? "s" : ""}
+                </Badge>
               </CardTitle>
-              <CardDescription className="line-clamp-2">{entry.description}</CardDescription>
+              <CardDescription className="line-clamp-2">
+                {entry.description}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-wrap gap-2">
@@ -287,10 +385,12 @@ export default function RD() {
               </div>
 
               <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Versions:</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Versions:
+                </p>
                 {entry.versions.map((version) => (
                   <div
-                    key={version.id}
+                    key={version._id}
                     className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover:bg-muted transition-colors"
                   >
                     <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -321,10 +421,18 @@ export default function RD() {
                   <Upload className="h-4 w-4" />
                   Add Version
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => openDialog(entry)}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => openDialog(entry)}
+                >
                   <Pencil className="h-4 w-4" />
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => confirmDelete(entry)}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => confirmDelete(entry)}
+                >
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
@@ -338,7 +446,9 @@ export default function RD() {
           <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <p className="text-lg text-muted-foreground">No R&D entries found</p>
           <p className="text-sm text-muted-foreground mt-2">
-            {searchQuery || filterTag !== "all" ? "Try adjusting your filters" : "Click 'Add R&D' to create your first entry"}
+            {searchQuery || filterTag !== "all"
+              ? "Try adjusting your filters"
+              : "Click 'Add R&D' to create your first entry"}
           </p>
         </div>
       )}
@@ -348,7 +458,15 @@ export default function RD() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
-              {isAddingVersion ? `Add Version ${currentEntry?.versions.length ? currentEntry.versions.length + 1 : 2}` : currentEntry ? "Edit R&D" : "Add New R&D"}
+              {isAddingVersion
+                ? `Add Version ${
+                    currentEntry?.versions.length
+                      ? currentEntry.versions.length + 1
+                      : 2
+                  }`
+                : currentEntry
+                ? "Edit R&D"
+                : "Add New R&D"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
@@ -359,7 +477,9 @@ export default function RD() {
                   <Input
                     id="title"
                     value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, title: e.target.value })
+                    }
                     placeholder="Enter R&D title"
                   />
                 </div>
@@ -368,7 +488,9 @@ export default function RD() {
                   <Textarea
                     id="description"
                     value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
                     placeholder="Enter R&D description"
                     rows={4}
                   />
@@ -378,14 +500,18 @@ export default function RD() {
                   <Input
                     id="tags"
                     value={formData.tags}
-                    onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, tags: e.target.value })
+                    }
                     placeholder="e.g. research, development, innovation"
                   />
                 </div>
               </>
             )}
             <div>
-              <Label htmlFor="file">PDF File {!currentEntry || isAddingVersion ? "*" : "(optional)"}</Label>
+              <Label htmlFor="file">
+                PDF File {!currentEntry || isAddingVersion ? "*" : "(optional)"}
+              </Label>
               <Input
                 id="file"
                 type="file"
@@ -403,8 +529,34 @@ export default function RD() {
             <Button variant="outline" onClick={closeDialog}>
               Cancel
             </Button>
-            <Button onClick={handleSubmit}>
-              {isAddingVersion ? "Add Version" : currentEntry ? "Update" : "Create"}
+            <Button onClick={handleSubmit} disabled={loading}>
+              {loading ? (
+                <svg
+                  className="animate-spin h-4 w-4 mr-2 text-white"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 100 16v-4l-3 3 3 3v-4a8 8 0 01-8-8z"
+                  />
+                </svg>
+              ) : null}
+              {isAddingVersion
+                ? "Add Version"
+                : currentEntry
+                ? "Update"
+                : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -417,10 +569,15 @@ export default function RD() {
             <DialogTitle>Delete R&D Entry</DialogTitle>
           </DialogHeader>
           <p className="text-muted-foreground">
-            Are you sure you want to delete <span className="font-semibold">{entryToDelete?.title}</span>? This will delete all versions and cannot be undone.
+            Are you sure you want to delete{" "}
+            <span className="font-semibold">{entryToDelete?.title}</span>? This
+            will delete all versions and cannot be undone.
           </p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(false)}
+            >
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleDelete}>
