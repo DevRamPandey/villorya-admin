@@ -538,10 +538,10 @@ export default function PackageSuppliers() {
                     {supplier.status}
                   </span>
                 </TableCell>
-                <TableCell>${supplier.minOrderValue}</TableCell>
-                <TableCell>${supplier.pricePerUnit}</TableCell>
+                <TableCell>₹{supplier.minOrderValue}</TableCell>
+                <TableCell>₹{supplier.pricePerUnit}</TableCell>
                 <TableCell>{supplier.minOrderWeight} kg</TableCell>
-                <TableCell>${supplier.pricePerKg}</TableCell>
+                <TableCell>₹{supplier.pricePerKg}</TableCell>
                 <TableCell>
                   <div className="flex gap-2">
                     <Button

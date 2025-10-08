@@ -253,8 +253,8 @@ export default function RawSuppliers() {
                       {supplier.status}
                     </span>
                   </TableCell>
-                  <TableCell>${supplier.minOrderValue}</TableCell>
-                  <TableCell>${supplier.pricePerGram}</TableCell>
+                  <TableCell>₹{supplier.minOrderValue}</TableCell>
+                  <TableCell>₹{supplier.pricePerGram}</TableCell>
                   <TableCell>
                     <div className="flex gap-2">
                       <Button
