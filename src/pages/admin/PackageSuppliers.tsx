@@ -284,42 +284,53 @@ export default function PackageSuppliers() {
 
       {/* Charts */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>Status Distribution</CardTitle>
-            <CardDescription>Suppliers by status</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer
-              config={{
-                active: { label: "Active", color: "hsl(var(--chart-1))" },
-                inactive: { label: "Inactive", color: "hsl(var(--chart-2))" },
-                pending: { label: "Pending", color: "hsl(var(--chart-3))" },
-              }}
-              className="h-[200px]"
+      <Card className="relative overflow-visible">
+  <CardHeader>
+    <CardTitle>Status Distribution</CardTitle>
+    <CardDescription>Suppliers by status</CardDescription>
+  </CardHeader>
+
+  {/* Important: allow overflow for the tooltip */}
+  <CardContent className="overflow-visible">
+    <div className="relative overflow-visible h-[240px]">
+      <ChartContainer
+        config={{
+          active: { label: "Active", color: "hsl(var(--chart-1))" },
+          inactive: { label: "Inactive", color: "hsl(var(--chart-2))" },
+          pending: { label: "Pending", color: "hsl(var(--chart-3))" },
+        }}
+        className="h-full overflow-visible"
+      >
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart margin={{ top: 30, right: 10, bottom: 10, left: 10 }}>
+            <Pie
+              data={statusData}
+              cx="50%"
+              cy="50%"
+              labelLine={false}
+              label={({ name, value }) => `${name}: ${value}`}
+              outerRadius={80}
+              fill="#8884d8"
+              dataKey="value"
             >
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={statusData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, value }) => `${name}: ${value}`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {statusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                </PieChart>
-              </ResponsiveContainer>
-            </ChartContainer>
-          </CardContent>
-        </Card>
+              {statusData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.color} />
+              ))}
+            </Pie>
+            <ChartTooltip
+              content={<ChartTooltipContent />}
+              wrapperStyle={{
+                overflow: "visible",
+                zIndex: 9999,
+                pointerEvents: "none",
+              }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </ChartContainer>
+    </div>
+  </CardContent>
+</Card>
 
         <Card>
           <CardHeader>
