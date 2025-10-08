@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, FileText, Upload, Search, Filter, Eye, X } from "lucide-react";
+import { Plus, Pencil, Trash2, FileText, Upload, Search, Filter, Eye } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface RDVersion {
@@ -434,12 +434,7 @@ export default function RD() {
       <Dialog open={isViewerOpen} onOpenChange={setIsViewerOpen}>
         <DialogContent className="max-w-6xl h-[90vh]">
           <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span>PDF Viewer</span>
-              <Button variant="ghost" size="icon" onClick={() => setIsViewerOpen(false)}>
-                <X className="h-4 w-4" />
-              </Button>
-            </DialogTitle>
+            <DialogTitle>PDF Viewer</DialogTitle>
           </DialogHeader>
           <div className="flex-1 h-full overflow-hidden">
             <iframe
