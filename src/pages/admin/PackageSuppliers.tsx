@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
-import { Plus, Pencil, Trash2, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, TrendingUp, Package, DollarSign, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer } from "recharts";
 import {
   Dialog,
   DialogContent,
@@ -180,6 +182,36 @@ export default function PackageSuppliers() {
     s.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Analytics data
+  const statusData = [
+    { name: "Active", value: suppliers.filter(s => s.status === "active").length, color: "hsl(var(--chart-1))" },
+    { name: "Inactive", value: suppliers.filter(s => s.status === "inactive").length, color: "hsl(var(--chart-2))" },
+    { name: "Pending", value: suppliers.filter(s => s.status === "pending").length, color: "hsl(var(--chart-3))" },
+  ];
+
+  const locationData = suppliers.reduce((acc, supplier) => {
+    const location = supplier.location || "Unknown";
+    const existing = acc.find(item => item.name === location);
+    if (existing) {
+      existing.count++;
+    } else {
+      acc.push({ name: location, count: 1 });
+    }
+    return acc;
+  }, [] as { name: string; count: number }[])
+  .sort((a, b) => b.count - a.count)
+  .slice(0, 5);
+
+  const priceRanges = [
+    { range: "0-100", count: suppliers.filter(s => s.pricePerKg > 0 && s.pricePerKg <= 100).length },
+    { range: "101-200", count: suppliers.filter(s => s.pricePerKg > 100 && s.pricePerKg <= 200).length },
+    { range: "201-300", count: suppliers.filter(s => s.pricePerKg > 200 && s.pricePerKg <= 300).length },
+    { range: "301+", count: suppliers.filter(s => s.pricePerKg > 300).length },
+  ];
+
+  const avgPricePerKg = suppliers.filter(s => s.pricePerKg > 0).reduce((sum, s) => sum + s.pricePerKg, 0) / suppliers.filter(s => s.pricePerKg > 0).length || 0;
+  const avgMinOrderWeight = suppliers.filter(s => s.minOrderWeight > 0).reduce((sum, s) => sum + s.minOrderWeight, 0) / suppliers.filter(s => s.minOrderWeight > 0).length || 0;
+
   if (loading)
     return <p className="text-center text-muted-foreground">Loading suppliers...</p>;
 
@@ -193,6 +225,151 @@ export default function PackageSuppliers() {
         <Button onClick={() => openDialog()} className="gap-2">
           <Plus className="h-4 w-4" /> Add Supplier
         </Button>
+      </div>
+
+      {/* Analytics Dashboard */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Suppliers</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{suppliers.length}</div>
+            <p className="text-xs text-muted-foreground">
+              {suppliers.filter(s => s.status === "active").length} active
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Avg Price/Kg</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">₹{avgPricePerKg.toFixed(2)}</div>
+            <p className="text-xs text-muted-foreground">
+              Average pricing
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Avg Min Order</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{avgMinOrderWeight.toFixed(0)} kg</div>
+            <p className="text-xs text-muted-foreground">
+              Minimum order weight
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Locations</CardTitle>
+            <MapPin className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{locationData.length}</div>
+            <p className="text-xs text-muted-foreground">
+              Unique locations
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Charts */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle>Status Distribution</CardTitle>
+            <CardDescription>Suppliers by status</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer
+              config={{
+                active: { label: "Active", color: "hsl(var(--chart-1))" },
+                inactive: { label: "Inactive", color: "hsl(var(--chart-2))" },
+                pending: { label: "Pending", color: "hsl(var(--chart-3))" },
+              }}
+              className="h-[200px]"
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={statusData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, value }) => `${name}: ${value}`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {statusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                </PieChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Price Range Distribution</CardTitle>
+            <CardDescription>Suppliers by price per kg (₹)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer
+              config={{
+                count: { label: "Count", color: "hsl(var(--chart-1))" },
+              }}
+              className="h-[200px]"
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={priceRanges}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="range" />
+                  <YAxis />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="count" fill="hsl(var(--chart-1))" />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Top Locations</CardTitle>
+            <CardDescription>Suppliers by location</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer
+              config={{
+                count: { label: "Count", color: "hsl(var(--chart-2))" },
+              }}
+              className="h-[200px]"
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={locationData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" />
+                  <YAxis dataKey="name" type="category" width={100} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="count" fill="hsl(var(--chart-2))" />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          </CardContent>
+        </Card>
       </div>
 
       <Card className="glass-panel p-6">
