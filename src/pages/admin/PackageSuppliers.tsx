@@ -8,6 +8,7 @@ import {
   Package,
   DollarSign,
   MapPin,
+  IndianRupee,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,10 +73,12 @@ interface PackageSupplier {
   status: "active" | "inactive" | "pending";
   minOrderValue: number;
   pricePerUnit: number;
-  minOrderWeight: number; // NEW
-  pricePerKg: number; // NEW
-  location: string; // NEW
-  website: string; // NEW
+  minOrderWeight: number;
+  pricePerKg: number;
+  location: string;
+  website: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export default function PackageSuppliers() {
@@ -107,6 +110,24 @@ export default function PackageSuppliers() {
     location: "", // NEW
     website: "", // NEW
   });
+
+  const today = new Date();
+  const isSameDay = (dateString: string) => {
+    const date = new Date(dateString);
+    return (
+      date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear()
+    );
+  };
+
+  const addedToday = suppliers.filter(
+    (s) => s.createdAt && isSameDay(s.createdAt)
+  ).length;
+
+  const updatedToday = suppliers.filter(
+    (s) => s.updatedAt && isSameDay(s.updatedAt)
+  ).length;
 
   const API_BASE =
     "https://villorya-server.vercel.app/api/v1/package-suppliers";
@@ -320,7 +341,7 @@ export default function PackageSuppliers() {
       </div>
 
       {/* Analytics Dashboard */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
@@ -335,11 +356,26 @@ export default function PackageSuppliers() {
             </p>
           </CardContent>
         </Card>
-
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Today’s Activity
+            </CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {addedToday}/{updatedToday}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              added / updated today
+            </p>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Avg Price/Kg</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <IndianRupee className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
