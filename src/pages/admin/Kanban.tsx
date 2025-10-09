@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Plus,
@@ -26,7 +26,30 @@ import {
   ExternalLink,
   GripVertical,
   Loader2,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  TrendingUp,
+  Users,
+  Calendar,
 } from "lucide-react";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -245,6 +268,62 @@ export default function Kanban() {
   const getTicketsByStatus = (status: Ticket["status"]) =>
     tickets.filter((ticket) => ticket.status === status);
 
+  // Analytics calculations
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const weekFromNow = new Date(today);
+  weekFromNow.setDate(weekFromNow.getDate() + 7);
+
+  const completedToday = tickets.filter(
+    (t) =>
+      t.status === "done" &&
+      new Date(t.dueDate) >= today &&
+      new Date(t.dueDate) < tomorrow
+  ).length;
+
+  const overdueTasks = tickets.filter(
+    (t) => new Date(t.dueDate) < today && t.status !== "done"
+  );
+
+  const dueThisWeek = tickets.filter(
+    (t) =>
+      new Date(t.dueDate) >= today &&
+      new Date(t.dueDate) <= weekFromNow &&
+      t.status !== "done"
+  );
+
+  const upcomingTasks = tickets
+    .filter((t) => t.status !== "done" && new Date(t.dueDate) >= today)
+    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+    .slice(0, 5);
+
+  // Status distribution for pie chart
+  const statusData = COLUMNS.map((col) => ({
+    name: col.title,
+    value: getTicketsByStatus(col.id as Ticket["status"]).length,
+  })).filter((d) => d.value > 0);
+
+  // Priority distribution
+  const priorityData = PRIORITIES.map((priority) => ({
+    name: priority.charAt(0).toUpperCase() + priority.slice(1),
+    value: tickets.filter((t) => t.priority === priority).length,
+  })).filter((d) => d.value > 0);
+
+  // Tasks by assignee
+  const assigneeData = Object.entries(
+    tickets.reduce((acc, ticket) => {
+      acc[ticket.assignedTo] = (acc[ticket.assignedTo] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>)
+  )
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  const COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -266,7 +345,234 @@ export default function Kanban() {
           <Loader2 className="animate-spin h-6 w-6 text-muted-foreground" />
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <>
+          {/* Analytics Section */}
+          <div className="space-y-6">
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Total Tasks
+                  </CardTitle>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{tickets.length}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {tickets.filter((t) => t.status === "done").length} completed
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Completed Today
+                  </CardTitle>
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{completedToday}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Tasks finished today
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Overdue Tasks
+                  </CardTitle>
+                  <AlertCircle className="h-4 w-4 text-destructive" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{overdueTasks.length}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Past due date
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Due This Week
+                  </CardTitle>
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{dueThisWeek.length}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Next 7 days
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Charts Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {/* Status Distribution */}
+              {statusData.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Status Distribution</CardTitle>
+                    <CardDescription>Tasks by workflow stage</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ChartContainer
+                      config={{
+                        value: { label: "Tasks", color: "hsl(var(--chart-1))" },
+                      }}
+                      className="h-[200px]"
+                    >
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={statusData}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={({ name, percent }) =>
+                              `${name}: ${(percent * 100).toFixed(0)}%`
+                            }
+                            outerRadius={60}
+                            fill="hsl(var(--chart-1))"
+                            dataKey="value"
+                          >
+                            {statusData.map((entry, index) => (
+                              <Cell
+                                key={`cell-${index}`}
+                                fill={COLORS[index % COLORS.length]}
+                              />
+                            ))}
+                          </Pie>
+                          <ChartTooltip content={<ChartTooltipContent />} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </ChartContainer>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Priority Distribution */}
+              {priorityData.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Priority Distribution</CardTitle>
+                    <CardDescription>Tasks by priority level</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ChartContainer
+                      config={{
+                        value: { label: "Tasks", color: "hsl(var(--chart-2))" },
+                      }}
+                      className="h-[200px]"
+                    >
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={priorityData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="name" />
+                          <YAxis />
+                          <ChartTooltip content={<ChartTooltipContent />} />
+                          <Bar dataKey="value" fill="hsl(var(--chart-2))" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartContainer>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Tasks by Assignee */}
+              {assigneeData.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Top Assignees</CardTitle>
+                    <CardDescription>Tasks per team member</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ChartContainer
+                      config={{
+                        count: { label: "Tasks", color: "hsl(var(--chart-3))" },
+                      }}
+                      className="h-[200px]"
+                    >
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={assigneeData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis
+                            dataKey="name"
+                            tick={{ fontSize: 10 }}
+                            interval={0}
+                            angle={-45}
+                            textAnchor="end"
+                            height={60}
+                          />
+                          <YAxis />
+                          <ChartTooltip content={<ChartTooltipContent />} />
+                          <Bar dataKey="count" fill="hsl(var(--chart-3))" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartContainer>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            {/* Upcoming Tasks */}
+            {upcomingTasks.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5" />
+                    Upcoming Tasks
+                  </CardTitle>
+                  <CardDescription>
+                    Next {upcomingTasks.length} tasks by due date
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {upcomingTasks.map((task) => (
+                      <div
+                        key={task._id}
+                        className="flex items-center justify-between p-3 border rounded-lg"
+                      >
+                        <div className="flex-1">
+                          <p className="font-semibold text-sm">{task.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Assigned to: {task.assignedTo}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={getPriorityColor(task.priority)}>
+                            {task.priority}
+                          </Badge>
+                          <div className="text-sm text-muted-foreground text-right">
+                            <div className="font-medium">
+                              {new Date(task.dueDate).toLocaleDateString()}
+                            </div>
+                            <div className="text-xs">
+                              {Math.ceil(
+                                (new Date(task.dueDate).getTime() -
+                                  today.getTime()) /
+                                  (1000 * 60 * 60 * 24)
+                              )}{" "}
+                              days
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* Kanban Board */}
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {COLUMNS.map((column) => (
             <div
               key={column.id}
@@ -380,6 +686,7 @@ export default function Kanban() {
             </div>
           ))}
         </div>
+        </>
       )}
 
       {/* Dialog */}
