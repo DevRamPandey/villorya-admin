@@ -8,6 +8,7 @@ import {
   Menu,
   Box,
   FlaskConical,
+  Trello,
 } from "lucide-react";
 import {
   Sidebar,
@@ -56,6 +57,11 @@ const menuItems = [
     title: "R&D",
     icon: FlaskConical,
     url: "/admin/rd",
+  },
+  {
+    title: "Kanban Board",
+    icon: Trello,
+    url: "/admin/kanban",
   },
 ];
 

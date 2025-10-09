@@ -19,6 +19,7 @@ import RawSuppliers from "./pages/admin/RawSuppliers";
 import CMS from "./pages/admin/CMS";
 import Questions from "./pages/admin/Questions";
 import RD from "./pages/admin/RD";
+import Kanban from "./pages/admin/Kanban";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +44,7 @@ const App = () => (
               <Route path="cms" element={<CMS />} />
               <Route path="questions" element={<Questions />} />
               <Route path="rd" element={<RD />} />
+              <Route path="kanban" element={<Kanban />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
