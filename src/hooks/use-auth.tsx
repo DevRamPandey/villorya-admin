@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       debugger;
-      const response = await fetch('https://villorya-server.vercel.app/api/v1/auth/login', {
+      const response = await fetch('https://api.villorya.com/api/v1/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),

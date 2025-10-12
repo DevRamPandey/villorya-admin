@@ -27,7 +27,7 @@ export default function Questions() {
   const { toast } = useToast();
   const { token } = useAuth();
 
-  const API_URL = "https://villorya-server.vercel.app/api/v1";
+  const API_URL = "https://api.villorya.com/api/v1";
   const axiosConfig = {
     headers: {
       Authorization: `Bearer ${token}`,

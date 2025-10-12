@@ -132,7 +132,7 @@ export default function PackageSuppliers() {
   ).length;
 
   const API_BASE =
-    "https://villorya-server.vercel.app/api/v1/package-suppliers";
+    "https://api.villorya.com/api/v1/package-suppliers";
 
   const fetchSuppliers = async () => {
     setLoading(true);

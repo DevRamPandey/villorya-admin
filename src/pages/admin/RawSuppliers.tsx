@@ -69,7 +69,7 @@ export default function RawSuppliers() {
     productName: "",
     location: "",
   });
-  const API_URL = "https://villorya-server.vercel.app/api/v1/raw-suppliers";
+  const API_URL = "https://api.villorya.com/api/v1/raw-suppliers";
 
   const axiosConfig = {
     headers: {

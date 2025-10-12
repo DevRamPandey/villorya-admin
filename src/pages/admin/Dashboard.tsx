@@ -60,7 +60,7 @@ export default function Dashboard() {
     const fetchDashboard = async () => {
       try {
         const res = await fetch(
-          "https://villorya-server.vercel.app/api/v1/dashboard",
+          "https://api.villorya.com/api/v1/dashboard",
           {
             headers: { Authorization: "Bearer " + token },
           }

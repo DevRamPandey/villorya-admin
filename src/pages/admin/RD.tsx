@@ -94,7 +94,7 @@ export default function RD() {
     loadEntries();
   }, []);
 
-  const API_URL = "https://villorya-server.vercel.app/api/v1/rd";
+  const API_URL = "https://api.villorya.com/api/v1/rd";
   const { token } = useAuth();
   const getAuthHeaders = () => {
     return {
@@ -168,7 +168,7 @@ export default function RD() {
 
       if (isAddingVersion && currentEntry) {
         res = await fetch(
-          `https://villorya-server.vercel.app/api/v1/rd/${currentEntry._id}/version`,
+          `https://api.villorya.com/api/v1/rd/${currentEntry._id}/version`,
           {
             method: "POST",
             headers,
@@ -177,7 +177,7 @@ export default function RD() {
         );
       } else if (currentEntry) {
         res = await fetch(
-          `https://villorya-server.vercel.app/api/v1/rd/${currentEntry._id}`,
+          `https://api.villorya.com/api/v1/rd/${currentEntry._id}`,
           {
             method: "PUT",
             headers,
@@ -185,7 +185,7 @@ export default function RD() {
           }
         );
       } else {
-        res = await fetch(`https://villorya-server.vercel.app/api/v1/rd`, {
+        res = await fetch(`https://api.villorya.com/api/v1/rd`, {
           method: "POST",
           headers,
           body: JSON.stringify(payload),
@@ -244,7 +244,7 @@ export default function RD() {
     const formData = new FormData();
     formData.append("file", file);
 
-    const res = await fetch("https://villorya-server.vercel.app/api/v1/rd/upload", {
+    const res = await fetch("https://api.villorya.com/api/v1/rd/upload", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,

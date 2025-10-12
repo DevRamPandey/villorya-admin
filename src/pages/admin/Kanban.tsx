@@ -66,7 +66,7 @@ interface Ticket {
   status: "todo" | "in-progress" | "uat" | "qa" | "done";
 }
 
-const API_URL = "https://villorya-server.vercel.app/api/v1/kanban";
+const API_URL = "https://api.villorya.com/api/v1/kanban";
 
 const COLUMNS = [
   { id: "todo", title: "To Do" },
