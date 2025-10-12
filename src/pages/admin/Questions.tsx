@@ -28,11 +28,7 @@ export default function Questions() {
   const { token } = useAuth();
 
   const API_URL = "https://api.villorya.com/api/v1";
-  const axiosConfig = {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  };
+  const axiosConfig = { headers: { Authorization: `Bearer ${token}` } };
 
   const [questions, setQuestions] = useState<Questions>({
     packageSuppliers: [],
@@ -43,125 +39,59 @@ export default function Questions() {
 
   const [loading, setLoading] = useState(false);
   const [newQuestion, setNewQuestion] = useState("");
-  const [newAnswer, setNewAnswer] = useState("");
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
   const [editQuestion, setEditQuestion] = useState("");
-  const [editingAnswerIndex, setEditingAnswerIndex] = useState<number | null>(null);
-  const [editAnswer, setEditAnswer] = useState("");
 
-  // Fetch all questions from API
- useEffect(() => {
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const res = await axios.get(`${API_URL}/questions`, axiosConfig);
+  // ✅ Each question gets its own "Add Answer" field
+  const [newAnswers, setNewAnswers] = useState<Record<string, string>>({});
 
-      const apiData = res.data?.data;
+  // ✅ Each answer edit field is tracked by questionId + index
+  const [editingAnswer, setEditingAnswer] = useState<{
+    questionId: string | null;
+    index: number | null;
+    text: string;
+  }>({ questionId: null, index: null, text: "" });
 
-      // Normalize shape in case API returns [] or null
-      const normalized: Questions = {
-        packageSuppliers: Array.isArray(apiData?.packageSuppliers)
-          ? apiData.packageSuppliers
-          : [],
-        rawSuppliers: Array.isArray(apiData?.rawSuppliers)
-          ? apiData.rawSuppliers
-          : [],
-        packageFAQs: Array.isArray(apiData?.packageFAQs)
-          ? apiData.packageFAQs
-          : [],
-        rawFAQs: Array.isArray(apiData?.rawFAQs)
-          ? apiData.rawFAQs
-          : [],
-      };
-
-      setQuestions(normalized);
-    } catch (error: any) {
-      toast({
-        title: "Failed to fetch questions",
-        description: error.response?.data?.message || error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (token) fetchData();
-}, [token]);
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!token) return;
+      setLoading(true);
+      try {
+        const res = await axios.get(`${API_URL}/questions`, axiosConfig);
+        const apiData = res.data?.data || {};
+        setQuestions({
+          packageSuppliers: apiData.packageSuppliers || [],
+          rawSuppliers: apiData.rawSuppliers || [],
+          packageFAQs: apiData.packageFAQs || [],
+          rawFAQs: apiData.rawFAQs || [],
+        });
+      } catch (error: any) {
+        toast({
+          title: "Failed to fetch questions",
+          description: error.response?.data?.message || error.message,
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [token]);
 
   // Add question
   const addQuestion = async (category: keyof Questions) => {
     if (!newQuestion.trim()) return;
     try {
       setLoading(true);
-      const res = await axios.post(
-        `${API_URL}/questions`,
-        { category, question: newQuestion },
-        axiosConfig
-      );
+      const res = await axios.post(`${API_URL}/questions`, { category, question: newQuestion }, axiosConfig);
       setQuestions((prev) => ({
         ...prev,
         [category]: [...prev[category], res.data.data],
       }));
       setNewQuestion("");
-      toast({ title: "Question added successfully" });
-    } catch (error: any) {
-      toast({
-        title: "Error adding question",
-        description: error.response?.data?.message || error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Update question
-  const updateQuestion = async (category: keyof Questions, id: string) => {
-    if (!editQuestion.trim()) return;
-    try {
-      setLoading(true);
-      const res = await axios.put(
-        `${API_URL}/questions/${id}`,
-        { question: editQuestion },
-        axiosConfig
-      );
-      setQuestions((prev) => ({
-        ...prev,
-        [category]: prev[category].map((q) =>
-          q._id === id ? res.data.data : q
-        ),
-      }));
-      setEditingQuestionId(null);
-      setEditQuestion("");
-      toast({ title: "Question updated successfully" });
-    } catch (error: any) {
-      toast({
-        title: "Error updating question",
-        description: error.response?.data?.message || error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Delete question
-  const removeQuestion = async (category: keyof Questions, id: string) => {
-    try {
-      setLoading(true);
-      await axios.delete(`${API_URL}/questions/${id}`, axiosConfig);
-      setQuestions((prev) => ({
-        ...prev,
-        [category]: prev[category].filter((q) => q._id !== id),
-      }));
-      toast({ title: "Question removed successfully" });
-    } catch (error: any) {
-      toast({
-        title: "Error deleting question",
-        description: error.response?.data?.message || error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Question added" });
+    } catch (e: any) {
+      toast({ title: "Error adding question", description: e.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -169,7 +99,8 @@ export default function Questions() {
 
   // Add answer
   const addAnswer = async (category: keyof Questions, questionId: string) => {
-    if (!newAnswer.trim()) return;
+    const newAnswer = newAnswers[questionId];
+    if (!newAnswer?.trim()) return;
     try {
       setLoading(true);
       const res = await axios.post(
@@ -183,14 +114,10 @@ export default function Questions() {
           q._id === questionId ? res.data.data : q
         ),
       }));
-      setNewAnswer("");
-      toast({ title: "Answer added successfully" });
-    } catch (error: any) {
-      toast({
-        title: "Error adding answer",
-        description: error.response?.data?.message || error.message,
-        variant: "destructive",
-      });
+      setNewAnswers((prev) => ({ ...prev, [questionId]: "" }));
+      toast({ title: "Answer added" });
+    } catch (e: any) {
+      toast({ title: "Error adding answer", description: e.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -200,14 +127,14 @@ export default function Questions() {
   const updateAnswer = async (
     category: keyof Questions,
     questionId: string,
-    answerIndex: number
+    answerIndex: number,
+    newText: string
   ) => {
-    if (!editAnswer.trim()) return;
     try {
       setLoading(true);
       const res = await axios.put(
         `${API_URL}/questions/${questionId}/answers/${answerIndex}`,
-        { answer: editAnswer },
+        { answer: newText },
         axiosConfig
       );
       setQuestions((prev) => ({
@@ -216,15 +143,10 @@ export default function Questions() {
           q._id === questionId ? res.data.data : q
         ),
       }));
-      setEditingAnswerIndex(null);
-      setEditAnswer("");
-      toast({ title: "Answer updated successfully" });
-    } catch (error: any) {
-      toast({
-        title: "Error updating answer",
-        description: error.response?.data?.message || error.message,
-        variant: "destructive",
-      });
+      setEditingAnswer({ questionId: null, index: null, text: "" });
+      toast({ title: "Answer updated" });
+    } catch (e: any) {
+      toast({ title: "Error updating answer", description: e.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -248,13 +170,26 @@ export default function Questions() {
           q._id === questionId ? res.data.data : q
         ),
       }));
-      toast({ title: "Answer removed successfully" });
-    } catch (error: any) {
-      toast({
-        title: "Error removing answer",
-        description: error.response?.data?.message || error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Answer removed" });
+    } catch (e: any) {
+      toast({ title: "Error removing answer", description: e.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Delete question
+  const removeQuestion = async (category: keyof Questions, id: string) => {
+    try {
+      setLoading(true);
+      await axios.delete(`${API_URL}/questions/${id}`, axiosConfig);
+      setQuestions((prev) => ({
+        ...prev,
+        [category]: prev[category].filter((q) => q._id !== id),
+      }));
+      toast({ title: "Question deleted" });
+    } catch (e: any) {
+      toast({ title: "Error deleting question", description: e.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -267,222 +202,149 @@ export default function Questions() {
           {title}
           {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
         </h3>
-        <div className="space-y-2">
-          <Label htmlFor="newQuestion">Add New Question</Label>
-          <div className="flex gap-2">
-            <Input
-              id="newQuestion"
-              placeholder="Enter question..."
-              value={newQuestion}
-              onChange={(e) => setNewQuestion(e.target.value)}
-              disabled={loading}
-            />
-            <Button onClick={() => addQuestion(category)} className="gap-2" disabled={loading}>
-              <Plus className="h-4 w-4" />
-              Add
-            </Button>
-          </div>
+        <div className="flex gap-2">
+          <Input
+            placeholder="Enter question..."
+            value={newQuestion}
+            onChange={(e) => setNewQuestion(e.target.value)}
+          />
+          <Button onClick={() => addQuestion(category)} disabled={loading}>
+            <Plus className="h-4 w-4 mr-1" /> Add
+          </Button>
         </div>
       </Card>
 
-      {/* Question List */}
-      <div className="space-y-3">
-        {questions[category].length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-8">
-            No questions added yet
-          </p>
-        ) : (
-          questions[category].map((question) => (
-            <Card key={question._id} className="p-4">
-              <div className="space-y-4">
-                {/* Question Header */}
-                {editingQuestionId === question._id ? (
-                  <div className="space-y-2">
-                    <Input
-                      value={editQuestion}
-                      onChange={(e) => setEditQuestion(e.target.value)}
-                    />
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={() => updateQuestion(category, question._id!)}
-                        size="sm"
-                        disabled={loading}
-                      >
-                        <Check className="h-4 w-4 mr-1" />
-                        Save
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          setEditingQuestionId(null);
-                          setEditQuestion("");
-                        }}
-                        size="sm"
-                        variant="outline"
-                      >
-                        <X className="h-4 w-4 mr-1" />
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex justify-between items-start">
-                    <h4 className="font-semibold">{question.question}</h4>
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={() => {
-                          setEditingQuestionId(question._id!);
-                          setEditQuestion(question.question);
-                        }}
-                        size="sm"
-                        variant="outline"
-                        disabled={loading}
-                      >
-                        <Edit2 className="h-4 w-4 mr-1" /> Edit
-                      </Button>
-                      <Button
-                        onClick={() => removeQuestion(category, question._id!)}
-                        size="sm"
-                        variant="destructive"
-                        disabled={loading}
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" /> Delete
-                      </Button>
-                    </div>
-                  </div>
-                )}
+      {questions[category].length === 0 ? (
+        <p className="text-sm text-center text-muted-foreground py-6">
+          No questions yet
+        </p>
+      ) : (
+        questions[category].map((question) => (
+          <Card key={question._id} className="p-4 space-y-3">
+            {/* Question */}
+            <div className="flex justify-between items-start">
+              <h4 className="font-semibold">{question.question}</h4>
+              <Button
+                onClick={() => removeQuestion(category, question._id!)}
+                variant="destructive"
+                size="sm"
+              >
+                <Trash2 className="h-4 w-4 mr-1" /> Delete
+              </Button>
+            </div>
 
-                {/* Answers */}
-                <div className="space-y-3 pl-4 border-l-2 border-muted">
-                  <Label className="text-sm font-medium">Answers</Label>
-                  <div className="flex gap-2">
-                    <Textarea
-                      placeholder="Add answer..."
-                      value={newAnswer}
-                      onChange={(e) => setNewAnswer(e.target.value)}
-                      disabled={loading}
-                    />
-                    <Button
-                      onClick={() => addAnswer(category, question._id!)}
-                      size="sm"
-                      disabled={loading}
-                    >
-                      <Plus className="h-4 w-4" /> Add
-                    </Button>
-                  </div>
+            {/* Add Answer */}
+            <div className="flex gap-2">
+              <Textarea
+                placeholder="Add answer..."
+                value={newAnswers[question._id!] || ""}
+                onChange={(e) =>
+                  setNewAnswers((prev) => ({
+                    ...prev,
+                    [question._id!]: e.target.value,
+                  }))
+                }
+              />
+              <Button
+                onClick={() => addAnswer(category, question._id!)}
+                disabled={loading}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
 
-                  {question.answers.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      No answers yet
-                    </p>
-                  ) : (
-                    question.answers.map((answer, i) => (
-                      <div key={i} className="bg-muted/30 p-3 rounded-lg flex justify-between">
-                        {editingAnswerIndex === i &&
-                        editingQuestionId === question._id ? (
-                          <div className="flex-1 space-y-2">
-                            <Textarea
-                              value={editAnswer}
-                              onChange={(e) => setEditAnswer(e.target.value)}
-                              disabled={loading}
-                            />
-                            <div className="flex gap-2">
-                              <Button
-                                onClick={() =>
-                                  updateAnswer(category, question._id!, i)
-                                }
-                                size="sm"
-                                disabled={loading}
-                              >
-                                <Check className="h-4 w-4 mr-1" /> Save
-                              </Button>
-                              <Button
-                                onClick={() => {
-                                  setEditingAnswerIndex(null);
-                                  setEditingQuestionId(null);
-                                  setEditAnswer("");
-                                }}
-                                size="sm"
-                                variant="outline"
-                              >
-                                <X className="h-4 w-4 mr-1" /> Cancel
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            <p className="flex-1 text-sm">{answer}</p>
-                            <div className="flex gap-1">
-                              <Button
-                                onClick={() => {
-                                  setEditingAnswerIndex(i);
-                                  setEditingQuestionId(question._id!);
-                                  setEditAnswer(answer);
-                                }}
-                                size="sm"
-                                variant="ghost"
-                                disabled={loading}
-                              >
-                                <Edit2 className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                onClick={() =>
-                                  removeAnswer(category, question._id!, i)
-                                }
-                                size="sm"
-                                variant="ghost"
-                                disabled={loading}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </>
-                        )}
+            {/* Answers */}
+            {question.answers.length === 0 ? (
+              <p className="text-sm text-muted-foreground pl-2">No answers yet</p>
+            ) : (
+              question.answers.map((answer, i) => (
+                <div key={i} className="bg-muted/30 rounded-lg p-3 flex justify-between items-start">
+                  {editingAnswer.questionId === question._id && editingAnswer.index === i ? (
+                    <div className="w-full space-y-2">
+                      <Textarea
+                        value={editingAnswer.text}
+                        onChange={(e) =>
+                          setEditingAnswer((prev) => ({ ...prev, text: e.target.value }))
+                        }
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            updateAnswer(category, question._id!, i, editingAnswer.text)
+                          }
+                        >
+                          <Check className="h-4 w-4 mr-1" /> Save
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            setEditingAnswer({ questionId: null, index: null, text: "" })
+                          }
+                        >
+                          <X className="h-4 w-4 mr-1" /> Cancel
+                        </Button>
                       </div>
-                    ))
+                    </div>
+                  ) : (
+                    <>
+                      <p className="flex-1 text-sm">{answer}</p>
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            setEditingAnswer({
+                              questionId: question._id!,
+                              index: i,
+                              text: answer,
+                            })
+                          }
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => removeAnswer(category, question._id!, i)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </>
                   )}
                 </div>
-              </div>
-            </Card>
-          ))
-        )}
-      </div>
+              ))
+            )}
+          </Card>
+        ))
+      )}
     </div>
   );
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-4xl font-bold tracking-tight mb-2">
-          Supplier Questions
-        </h1>
+        <h1 className="text-3xl font-bold mb-2">Supplier Questions</h1>
         <p className="text-muted-foreground">
-          Manage questions for suppliers and FAQs
+          Manage supplier questions and FAQs.
         </p>
       </div>
 
-      <Card className="glass-panel p-6">
-        <Tabs defaultValue="packageQuestions" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="packageQuestions">
-              Package Questions
-            </TabsTrigger>
-            <TabsTrigger value="rawQuestions">Raw Material Questions</TabsTrigger>
+      <Card className="p-6">
+        <Tabs defaultValue="packageSuppliers" className="w-full">
+          <TabsList className="grid grid-cols-4 w-full">
+            <TabsTrigger value="packageSuppliers">Package Questions</TabsTrigger>
+            <TabsTrigger value="rawSuppliers">Raw Questions</TabsTrigger>
             <TabsTrigger value="packageFAQs">Package FAQs</TabsTrigger>
-            <TabsTrigger value="rawFAQs">Raw Material FAQs</TabsTrigger>
+            <TabsTrigger value="rawFAQs">Raw FAQs</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="packageQuestions" className="mt-6">
-            {renderQuestionList("packageSuppliers", "Questions for Package Suppliers")}
-          </TabsContent>
-          <TabsContent value="rawQuestions" className="mt-6">
-            {renderQuestionList("rawSuppliers", "Questions for Raw Material Suppliers")}
-          </TabsContent>
-          <TabsContent value="packageFAQs" className="mt-6">
-            {renderQuestionList("packageFAQs", "FAQs - Package Suppliers")}
-          </TabsContent>
-          <TabsContent value="rawFAQs" className="mt-6">
-            {renderQuestionList("rawFAQs", "FAQs - Raw Material Suppliers")}
-          </TabsContent>
+          <TabsContent value="packageSuppliers">{renderQuestionList("packageSuppliers", "Package Questions")}</TabsContent>
+          <TabsContent value="rawSuppliers">{renderQuestionList("rawSuppliers", "Raw Questions")}</TabsContent>
+          <TabsContent value="packageFAQs">{renderQuestionList("packageFAQs", "Package FAQs")}</TabsContent>
+          <TabsContent value="rawFAQs">{renderQuestionList("rawFAQs", "Raw FAQs")}</TabsContent>
         </Tabs>
       </Card>
     </div>
