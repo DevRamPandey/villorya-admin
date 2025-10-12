@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/alert-dialog';
 
 export interface FAQ {
-  id: string;
+  _id: string;
   question: string;
   answer: string;
 }
@@ -34,12 +34,12 @@ export function FAQManager({ faqs, onChange }: FAQManagerProps) {
   const [editQuestion, setEditQuestion] = useState('');
   const [editAnswer, setEditAnswer] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const handleAdd = () => {
     if (!newQuestion.trim() || !newAnswer.trim()) return;
 
-    const newFAQ: FAQ = {
-      id: Date.now().toString(),
+    const newFAQ: any = {
       question: newQuestion,
       answer: newAnswer,
     };
@@ -50,7 +50,7 @@ export function FAQManager({ faqs, onChange }: FAQManagerProps) {
   };
 
   const handleEdit = (faq: FAQ) => {
-    setEditingId(faq.id);
+    setEditingId(faq._id);
     setEditQuestion(faq.question);
     setEditAnswer(faq.answer);
   };
@@ -60,7 +60,7 @@ export function FAQManager({ faqs, onChange }: FAQManagerProps) {
 
     onChange(
       faqs.map((faq) =>
-        faq.id === editingId
+        faq._id === editingId
           ? { ...faq, question: editQuestion, answer: editAnswer }
           : faq
       )
@@ -76,8 +76,17 @@ export function FAQManager({ faqs, onChange }: FAQManagerProps) {
     setEditAnswer('');
   };
 
-  const handleDelete = (id: string) => {
-    onChange(faqs.filter((faq) => faq.id !== id));
+  const confirmDelete = (id: string) => {
+
+    setDeleteId(id);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDelete = () => {
+    debugger;
+    if (!deleteId) return;
+    onChange(faqs.filter((faq) => faq._id !== deleteId));
+    setIsDeleteDialogOpen(false);
     setDeleteId(null);
   };
 
@@ -122,8 +131,8 @@ export function FAQManager({ faqs, onChange }: FAQManagerProps) {
           </p>
         ) : (
           faqs.map((faq) => (
-            <Card key={faq.id} className="p-4">
-              {editingId === faq.id ? (
+            <Card key={faq._id} className="p-4">
+              {editingId === faq._id ? (
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label>Question</Label>
@@ -173,7 +182,7 @@ export function FAQManager({ faqs, onChange }: FAQManagerProps) {
                       Edit
                     </Button>
                     <Button
-                      onClick={() => setDeleteId(faq.id)}
+                      onClick={() => confirmDelete(faq._id)}
                       size="sm"
                       variant="destructive"
                       className="gap-2"
@@ -190,19 +199,19 @@ export function FAQManager({ faqs, onChange }: FAQManagerProps) {
       </div>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete FAQ?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete this FAQ.
+              This action cannot be undone. This will permanently delete the FAQ.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => deleteId && handleDelete(deleteId)}>
-              Delete
-            </AlertDialogAction>
+            <AlertDialogCancel onClick={() => setIsDeleteDialogOpen(false)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
