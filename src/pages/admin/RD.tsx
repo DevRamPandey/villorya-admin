@@ -125,12 +125,21 @@ export default function RD() {
     }
   };
 
-  const handleSubmit = async () => {
-    if (
-      !formData.title ||
-      !formData.description ||
-      (!formData.file && !currentEntry && !isAddingVersion)
-    ) {
+ const handleSubmit = async () => {
+  debugger
+  if (isAddingVersion) {
+    // Only require a file when adding a new version
+    if (!formData.file) {
+      toast({
+        title: "Error",
+        description: "Please select a PDF file to upload",
+        variant: "destructive",
+      });
+      return;
+    }
+  } else {
+    // For create or edit, require title/description
+    if (!formData.title || !formData.description) {
       toast({
         title: "Error",
         description: "Please fill all required fields",
@@ -138,82 +147,77 @@ export default function RD() {
       });
       return;
     }
+  }
 
-    setLoading(true);
+  setLoading(true);
+  try {
+    let fileUrl: string | null = null;
 
-    try {
-      let fileUrl: string | null = null;
-
-      if (formData.file) {
-        fileUrl = await uploadFile(formData.file);
-      }
-
-      debugger;
-
-      const payload = {
-        title: formData.title,
-        description: formData.description,
-        tags: formData.tags
-          .split(",")
-          .map((t) => t.trim())
-          .filter(Boolean),
-        fileName: formData.file?.name,
-        fileUrl, // use uploaded file URL
-      };
-
-      let res, data;
-      const headers = {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      };
-
-      if (isAddingVersion && currentEntry) {
-        res = await fetch(
-          `https://api.villorya.com/api/v1/rd/${currentEntry._id}/version`,
-          {
-            method: "POST",
-            headers,
-            body: JSON.stringify(payload),
-          }
-        );
-      } else if (currentEntry) {
-        res = await fetch(
-          `https://api.villorya.com/api/v1/rd/${currentEntry._id}`,
-          {
-            method: "PUT",
-            headers,
-            body: JSON.stringify(payload),
-          }
-        );
-      } else {
-        res = await fetch(`https://api.villorya.com/api/v1/rd`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(payload),
-        });
-      }
-
-      data = await res.json();
-      if (!data.success) throw new Error(data.message || "Operation failed");
-
-      toast({
-        title: "Success",
-        description: currentEntry
-          ? "Updated successfully"
-          : "Created successfully",
-      });
-      closeDialog();
-      loadEntries();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to save R&D",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+    if (formData.file) {
+      fileUrl = await uploadFile(formData.file);
     }
-  };
+
+    const payload = {
+      title: formData.title,
+      description: formData.description,
+      tags: formData.tags
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean),
+      fileName: formData.file?.name,
+      fileUrl,
+    };
+
+    let res, data;
+    const headers = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    };
+
+    if (isAddingVersion && currentEntry) {
+      res = await fetch(`${API_URL}/${currentEntry._id}/version`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+      });
+    } else if (currentEntry) {
+      res = await fetch(`${API_URL}/${currentEntry._id}`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify(payload),
+      });
+    } else {
+      res = await fetch(API_URL, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+      });
+    }
+
+    data = await res.json();
+    if (!data.success) throw new Error(data.message || "Operation failed");
+
+    toast({
+      title: "Success",
+      description: isAddingVersion
+        ? "Version added successfully"
+        : currentEntry
+        ? "Updated successfully"
+        : "Created successfully",
+    });
+    closeDialog();
+    loadEntries();
+  } catch (error: any) {
+    toast({
+      title: "Error",
+      description: error.message || "Failed to save R&D",
+      variant: "destructive",
+    });
+  } finally {
+    setLoading(false);
+  }
+};
+
   const handleDelete = async () => {
     if (!entryToDelete) return;
     try {
@@ -516,7 +520,7 @@ const uploadFile = async (file: File) => {
                 </div>
               </>
             )}
-            <div>
+            {(!currentEntry || isAddingVersion)  && <div>
               <Label htmlFor="file">
                 PDF File {!currentEntry || isAddingVersion ? "*" : "(optional)"}
               </Label>
@@ -531,7 +535,7 @@ const uploadFile = async (file: File) => {
                   Selected: {formData.file.name}
                 </p>
               )}
-            </div>
+            </div>}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={closeDialog}>
@@ -601,7 +605,7 @@ const uploadFile = async (file: File) => {
           <div className="flex-1 h-full overflow-hidden">
             <iframe
               src={viewingPdf}
-              className="w-full h-full border-0 rounded-md"
+              className="w-full h-full border-0 rounded-md mt-4"
               title="PDF Viewer"
             />
           </div>
