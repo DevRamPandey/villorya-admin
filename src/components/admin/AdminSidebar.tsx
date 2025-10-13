@@ -9,6 +9,7 @@ import {
   Box,
   FlaskConical,
   Trello,
+  Mail,
 } from "lucide-react";
 import {
   Sidebar,
@@ -62,6 +63,11 @@ const menuItems = [
     title: "Kanban Board",
     icon: Trello,
     url: "/admin/kanban",
+  },
+  {
+    title: "Newsletter",
+    icon: Mail,
+    url: "/admin/newsletter",
   },
 ];
 
