@@ -239,23 +239,29 @@ export default function RD() {
     }
   };
 
-  const uploadFile = async (file: File) => {
-    debugger;
-    const formData = new FormData();
-    formData.append("file", file);
+const uploadFile = async (file: File) => {
+  debugger
+  const formData = new FormData();
+  formData.append("file", file); // Key must match your multer field name
 
-    const res = await fetch("https://api.villorya.com/api/v1/rd/upload", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: formData,
-    });
+  const res = await fetch("https://api.villorya.com/api/v1/rd/upload", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`, // Only auth header
+      // DO NOT set 'Content-Type' here
+    },
+    body: formData,
+  });
 
-    const data = await res.json();
-    if (!data.success) throw new Error(data.message || "File upload failed");
-    return data.fileUrl; 
-  };
+  const data = await res.json();
+
+  if (!data.success) {
+    throw new Error(data.message || "File upload failed");
+  }
+
+  return data.fileUrl; 
+};
+
 
   const saveEntries = (newEntries: RDEntry[]) => {
     localStorage.setItem("rd_entries", JSON.stringify(newEntries));
