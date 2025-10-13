@@ -10,6 +10,7 @@ import {
   FlaskConical,
   Trello,
   Mail,
+  MessageSquare,
 } from "lucide-react";
 import {
   Sidebar,
@@ -68,6 +69,11 @@ const menuItems = [
     title: "Newsletter",
     icon: Mail,
     url: "/admin/newsletter",
+  },
+  {
+    title: "Contact Us",
+    icon: MessageSquare,
+    url: "/admin/contact-us",
   },
 ];
 

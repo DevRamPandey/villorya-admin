@@ -21,6 +21,7 @@ import Questions from "./pages/admin/Questions";
 import RD from "./pages/admin/RD";
 import Kanban from "./pages/admin/Kanban";
 import Newsletter from "./pages/admin/Newsletter";
+import ContactUs from "./pages/admin/ContactUs";
 
 const queryClient = new QueryClient();
 
@@ -47,6 +48,7 @@ const App = () => (
               <Route path="rd" element={<RD />} />
               <Route path="kanban" element={<Kanban />} />
               <Route path="newsletter" element={<Newsletter />} />
+              <Route path="contact-us" element={<ContactUs />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

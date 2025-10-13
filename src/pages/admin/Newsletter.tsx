@@ -2,11 +2,14 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Trash2, Download, Users, TrendingUp, Calendar } from "lucide-react";
+import { Mail, Trash2, Download, Users, TrendingUp, Calendar, Send, Eye, Plus } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer, Tooltip } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -18,13 +21,33 @@ interface Subscriber {
   status: "active" | "unsubscribed";
 }
 
+interface SentNewsletter {
+  id: string;
+  subject: string;
+  content: string;
+  recipients: string[];
+  sentAt: string;
+  recipientType: "all" | "custom";
+}
+
 const Newsletter = () => {
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
+  const [sentNewsletters, setSentNewsletters] = useState<SentNewsletter[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [isViewOpen, setIsViewOpen] = useState(false);
+  const [selectedNewsletter, setSelectedNewsletter] = useState<SentNewsletter | null>(null);
+  const [newsletterForm, setNewsletterForm] = useState({
+    subject: "",
+    content: "",
+    recipientType: "all" as "all" | "custom",
+    customEmails: "",
+  });
   const { toast } = useToast();
 
   useEffect(() => {
     loadSubscribers();
+    loadSentNewsletters();
   }, []);
 
   const loadSubscribers = () => {
@@ -32,6 +55,72 @@ const Newsletter = () => {
     if (stored) {
       setSubscribers(JSON.parse(stored));
     }
+  };
+
+  const loadSentNewsletters = () => {
+    const stored = localStorage.getItem("sent-newsletters");
+    if (stored) {
+      setSentNewsletters(JSON.parse(stored));
+    }
+  };
+
+  const sendNewsletter = () => {
+    if (!newsletterForm.subject || !newsletterForm.content) {
+      toast({
+        title: "Error",
+        description: "Please fill in subject and content.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    let recipients: string[] = [];
+    
+    if (newsletterForm.recipientType === "all") {
+      recipients = subscribers
+        .filter((sub) => sub.status === "active")
+        .map((sub) => sub.email);
+    } else {
+      recipients = newsletterForm.customEmails
+        .split(",")
+        .map((email) => email.trim())
+        .filter((email) => email);
+    }
+
+    if (recipients.length === 0) {
+      toast({
+        title: "Error",
+        description: "No recipients found.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const newNewsletter: SentNewsletter = {
+      id: Date.now().toString(),
+      subject: newsletterForm.subject,
+      content: newsletterForm.content,
+      recipients,
+      sentAt: new Date().toISOString(),
+      recipientType: newsletterForm.recipientType,
+    };
+
+    const updated = [...sentNewsletters, newNewsletter];
+    setSentNewsletters(updated);
+    localStorage.setItem("sent-newsletters", JSON.stringify(updated));
+
+    toast({
+      title: "Newsletter sent!",
+      description: `Sent to ${recipients.length} recipient(s).`,
+    });
+
+    setNewsletterForm({
+      subject: "",
+      content: "",
+      recipientType: "all",
+      customEmails: "",
+    });
+    setIsComposeOpen(false);
   };
 
   const deleteSubscriber = (id: string) => {
@@ -134,10 +223,94 @@ const Newsletter = () => {
           <h1 className="text-3xl font-bold">Newsletter Management</h1>
           <p className="text-muted-foreground">Manage your email subscribers and campaigns</p>
         </div>
-        <Button onClick={exportToCSV} disabled={subscribers.length === 0}>
-          <Download className="mr-2 h-4 w-4" />
-          Export CSV
-        </Button>
+        <div className="flex gap-2">
+          <Dialog open={isComposeOpen} onOpenChange={setIsComposeOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Send className="mr-2 h-4 w-4" />
+                Compose Newsletter
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Compose Newsletter</DialogTitle>
+                <DialogDescription>
+                  Create and send a newsletter to your subscribers
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium">Subject</label>
+                  <Input
+                    placeholder="Newsletter subject..."
+                    value={newsletterForm.subject}
+                    onChange={(e) =>
+                      setNewsletterForm({ ...newsletterForm, subject: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Content</label>
+                  <Textarea
+                    placeholder="Newsletter content..."
+                    value={newsletterForm.content}
+                    onChange={(e) =>
+                      setNewsletterForm({ ...newsletterForm, content: e.target.value })
+                    }
+                    rows={10}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Recipients</label>
+                  <div className="flex gap-4 mt-2">
+                    <Button
+                      variant={newsletterForm.recipientType === "all" ? "default" : "outline"}
+                      onClick={() =>
+                        setNewsletterForm({ ...newsletterForm, recipientType: "all" })
+                      }
+                    >
+                      All Subscribers ({subscribers.filter((s) => s.status === "active").length})
+                    </Button>
+                    <Button
+                      variant={newsletterForm.recipientType === "custom" ? "default" : "outline"}
+                      onClick={() =>
+                        setNewsletterForm({ ...newsletterForm, recipientType: "custom" })
+                      }
+                    >
+                      Custom Emails
+                    </Button>
+                  </div>
+                </div>
+                {newsletterForm.recipientType === "custom" && (
+                  <div>
+                    <label className="text-sm font-medium">Email Addresses (comma-separated)</label>
+                    <Textarea
+                      placeholder="email1@example.com, email2@example.com"
+                      value={newsletterForm.customEmails}
+                      onChange={(e) =>
+                        setNewsletterForm({ ...newsletterForm, customEmails: e.target.value })
+                      }
+                      rows={3}
+                    />
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsComposeOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={sendNewsletter}>
+                  <Send className="mr-2 h-4 w-4" />
+                  Send Newsletter
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <Button onClick={exportToCSV} disabled={subscribers.length === 0} variant="outline">
+            <Download className="mr-2 h-4 w-4" />
+            Export CSV
+          </Button>
+        </div>
       </div>
 
       {/* Analytics KPIs */}
@@ -265,76 +438,173 @@ const Newsletter = () => {
         </Card>
       </div>
 
-      {/* Subscriber Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>All Subscribers</CardTitle>
-          <CardDescription>Manage your newsletter subscribers</CardDescription>
-          <div className="mt-4">
-            <Input
-              placeholder="Search by email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="max-w-sm"
-            />
-          </div>
-        </CardHeader>
-        <CardContent>
-          {filteredSubscribers.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Mail className="mx-auto h-12 w-12 mb-4" />
-              <p>No subscribers found</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Subscribed At</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredSubscribers.map((subscriber) => (
-                  <TableRow key={subscriber.id}>
-                    <TableCell className="font-medium">{subscriber.email}</TableCell>
-                    <TableCell>{format(new Date(subscriber.subscribedAt), "PPP")}</TableCell>
-                    <TableCell>
-                      <Badge variant={subscriber.status === "active" ? "default" : "secondary"}>
-                        {subscriber.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Subscriber</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to delete this subscriber? This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => deleteSubscriber(subscriber.id)}>
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      {/* Tabs for Subscribers and Sent Newsletters */}
+      <Tabs defaultValue="subscribers" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="subscribers">Subscribers</TabsTrigger>
+          <TabsTrigger value="sent">Sent Newsletters ({sentNewsletters.length})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="subscribers" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>All Subscribers</CardTitle>
+              <CardDescription>Manage your newsletter subscribers</CardDescription>
+              <div className="mt-4">
+                <Input
+                  placeholder="Search by email..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="max-w-sm"
+                />
+              </div>
+            </CardHeader>
+            <CardContent>
+              {filteredSubscribers.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Mail className="mx-auto h-12 w-12 mb-4" />
+                  <p>No subscribers found</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Subscribed At</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredSubscribers.map((subscriber) => (
+                      <TableRow key={subscriber.id}>
+                        <TableCell className="font-medium">{subscriber.email}</TableCell>
+                        <TableCell>{format(new Date(subscriber.subscribedAt), "PPP")}</TableCell>
+                        <TableCell>
+                          <Badge variant={subscriber.status === "active" ? "default" : "secondary"}>
+                            {subscriber.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Subscriber</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this subscriber? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => deleteSubscriber(subscriber.id)}>
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="sent" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Sent Newsletters</CardTitle>
+              <CardDescription>View all newsletters you've sent</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {sentNewsletters.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Send className="mx-auto h-12 w-12 mb-4" />
+                  <p>No newsletters sent yet</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Subject</TableHead>
+                      <TableHead>Recipients</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Sent At</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sentNewsletters
+                      .sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime())
+                      .map((newsletter) => (
+                        <TableRow key={newsletter.id}>
+                          <TableCell className="font-medium">{newsletter.subject}</TableCell>
+                          <TableCell>{newsletter.recipients.length}</TableCell>
+                          <TableCell>
+                            <Badge variant={newsletter.recipientType === "all" ? "default" : "secondary"}>
+                              {newsletter.recipientType === "all" ? "All Subscribers" : "Custom"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{format(new Date(newsletter.sentAt), "PPP p")}</TableCell>
+                          <TableCell className="text-right">
+                            <Dialog open={isViewOpen && selectedNewsletter?.id === newsletter.id} onOpenChange={(open) => {
+                              setIsViewOpen(open);
+                              if (!open) setSelectedNewsletter(null);
+                            }}>
+                              <DialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setSelectedNewsletter(newsletter)}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-2xl">
+                                <DialogHeader>
+                                  <DialogTitle>{newsletter.subject}</DialogTitle>
+                                  <DialogDescription>
+                                    Sent to {newsletter.recipients.length} recipient(s) on{" "}
+                                    {format(new Date(newsletter.sentAt), "PPP p")}
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4">
+                                  <div>
+                                    <h4 className="font-medium mb-2">Content:</h4>
+                                    <div className="bg-muted p-4 rounded-md whitespace-pre-wrap">
+                                      {newsletter.content}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <h4 className="font-medium mb-2">Recipients:</h4>
+                                    <div className="bg-muted p-4 rounded-md max-h-48 overflow-y-auto">
+                                      {newsletter.recipients.map((email, idx) => (
+                                        <div key={idx} className="text-sm">
+                                          {email}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
