@@ -598,9 +598,6 @@ const uploadFile = async (file: File) => {
       {/* PDF Viewer Dialog */}
       <Dialog open={isViewerOpen} onOpenChange={setIsViewerOpen}>
         <DialogContent className="max-w-6xl h-[90vh]">
-          <DialogHeader>
-            <DialogTitle>PDF Viewer</DialogTitle>
-          </DialogHeader>
           <div className="flex-1 h-full overflow-hidden">
             <iframe
               src={viewingPdf}
