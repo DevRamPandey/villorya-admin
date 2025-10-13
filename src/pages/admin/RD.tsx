@@ -42,7 +42,7 @@ interface RDVersion {
   _id: string;
   versionNumber: number;
   fileName: string;
-  fileData: string;
+  fileUrl: string;
   uploadedAt: string;
 }
 
@@ -307,6 +307,7 @@ const uploadFile = async (file: File) => {
   };
 
   const viewPdf = (fileData: string) => {
+    debugger
     setViewingPdf(fileData);
     setIsViewerOpen(true);
   };
@@ -409,7 +410,7 @@ const uploadFile = async (file: File) => {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => viewPdf(version.fileData)}
+                      onClick={() => viewPdf(version.fileUrl)}
                       className="flex-shrink-0"
                     >
                       <Eye className="h-4 w-4" />
