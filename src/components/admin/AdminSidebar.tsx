@@ -11,6 +11,10 @@ import {
   Trello,
   Mail,
   MessageSquare,
+  Users,
+  ShoppingCart,
+  FileEdit,
+  Warehouse,
 } from "lucide-react";
 import {
   Sidebar,
@@ -74,6 +78,26 @@ const menuItems = [
     title: "Contact Us",
     icon: MessageSquare,
     url: "/admin/contact-us",
+  },
+  {
+    title: "Users",
+    icon: Users,
+    url: "/admin/users",
+  },
+  {
+    title: "Orders",
+    icon: ShoppingCart,
+    url: "/admin/orders",
+  },
+  {
+    title: "Blogs",
+    icon: FileEdit,
+    url: "/admin/blogs",
+  },
+  {
+    title: "Inventory",
+    icon: Warehouse,
+    url: "/admin/inventory",
   },
 ];
 
