@@ -1,18 +1,25 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card, CardContent, CardDescription, CardHeader, CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { MessageSquare, Clock, CheckCircle2, Users, Mail, Calendar } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useAuth } from "@/hooks/use-auth";
+import {
+  MessageSquare, Clock, CheckCircle2, Mail, Calendar, Loader2, AlertCircle,
+} from "lucide-react";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { format } from "date-fns";
 
 type TicketStatus = "received" | "pending" | "done";
 
 interface ContactTicket {
-  id: string;
+  _id: string;
   name: string;
   email: string;
   message: string;
@@ -23,107 +30,62 @@ interface ContactTicket {
   adminComment?: string;
 }
 
+const API_URL = "https://api.villorya.com/api/v1/contact";
+
 const ContactUs = () => {
+  const { token } = useAuth();
+  const { toast } = useToast();
+
   const [tickets, setTickets] = useState<ContactTicket[]>([]);
   const [draggedTicket, setDraggedTicket] = useState<ContactTicket | null>(null);
   const [isCommentDialogOpen, setIsCommentDialogOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<ContactTicket | null>(null);
   const [comment, setComment] = useState("");
-  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadTickets();
-  }, []);
+  const authHeaders = {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  };
 
-  const loadTickets = () => {
-    const stored = localStorage.getItem("contact-tickets");
-    if (stored) {
-      setTickets(JSON.parse(stored));
-    } else {
-      // Initialize with dummy data
-      const dummyTickets: ContactTicket[] = [
-        {
-          id: "1",
-          name: "John Doe",
-          email: "john@example.com",
-          message: "I have a question about your product delivery times.",
-          status: "received",
-          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: "2",
-          name: "Jane Smith",
-          email: "jane@example.com",
-          message: "Can I get a bulk discount for orders over 100 units?",
-          status: "received",
-          createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: "3",
-          name: "Mike Johnson",
-          email: "mike@example.com",
-          message: "I need help with my recent order #12345.",
-          status: "pending",
-          createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-          movedToPendingAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: "4",
-          name: "Sarah Wilson",
-          email: "sarah@example.com",
-          message: "What are your shipping options to Europe?",
-          status: "done",
-          createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-          movedToPendingAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
-          completedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-          adminComment: "Responded with detailed shipping information and pricing.",
-        },
-        {
-          id: "5",
-          name: "Tom Brown",
-          email: "tom@example.com",
-          message: "I would like to return an item from my recent purchase.",
-          status: "done",
-          createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-          movedToPendingAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
-          completedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-          adminComment: "Processed return request and sent return label.",
-        },
-      ];
-      setTickets(dummyTickets);
-      localStorage.setItem("contact-tickets", JSON.stringify(dummyTickets));
+  const loadTickets = async () => {
+    if (!token) return;
+    setLoading(true);
+    setError(null);
+
+    try {
+      debugger;
+      const res = await fetch(`${API_URL}/`, { headers: authHeaders });
+      if (!res.ok) throw new Error("Failed to fetch tickets from server");
+      const data = await res.json();
+ 
+      setTickets(data.data||[]);
+    } catch (err: any) {
+      setError(err.message || "Unable to connect to server");
+      setTickets([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDragStart = (ticket: ContactTicket) => {
-    setDraggedTicket(ticket);
-  };
+  useEffect(() => {
+    loadTickets();
+  }, [token]);
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
+  const handleDragStart = (ticket: ContactTicket) => setDraggedTicket(ticket);
+  const handleDragOver = (e: React.DragEvent) => e.preventDefault();
 
-  const handleDrop = (status: TicketStatus) => {
+  const handleDrop = async (status: TicketStatus) => {
     if (!draggedTicket) return;
 
-    // Only allow dragging from received to pending
     if (draggedTicket.status === "received" && status === "pending") {
-      const updatedTickets = tickets.map((ticket) =>
-        ticket.id === draggedTicket.id
-          ? { ...ticket, status, movedToPendingAt: new Date().toISOString() }
-          : ticket
-      );
-      setTickets(updatedTickets);
-      localStorage.setItem("contact-tickets", JSON.stringify(updatedTickets));
-      toast({
-        title: "Ticket moved to Pending",
-        description: "You can now add a comment to complete this ticket.",
-      });
+      await moveToPending(draggedTicket._id);
     } else if (draggedTicket.status === "pending" && status === "done") {
-      // Don't allow direct drag to done, must add comment
       toast({
         title: "Comment required",
-        description: "Please add a comment before completing the ticket.",
+        description: "Add a comment before completing the ticket.",
         variant: "destructive",
       });
     }
@@ -131,21 +93,24 @@ const ContactUs = () => {
     setDraggedTicket(null);
   };
 
-  const openCommentDialog = (ticket: ContactTicket) => {
-    if (ticket.status !== "pending") {
-      toast({
-        title: "Not allowed",
-        description: "Only pending tickets can be completed with comments.",
-        variant: "destructive",
+  const moveToPending = async (id: string) => {
+    setActionLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/${id}/move-to-pending`, {
+        method: "PATCH",
+        headers: authHeaders,
       });
-      return;
+      if (!res.ok) throw new Error("Failed to move ticket to pending");
+      toast({ title: "Moved to Pending", description: "Ticket is now being processed." });
+      await loadTickets();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setActionLoading(false);
     }
-    setSelectedTicket(ticket);
-    setComment("");
-    setIsCommentDialogOpen(true);
   };
 
-  const submitComment = () => {
+  const submitComment = async () => {
     if (!selectedTicket || !comment.trim()) {
       toast({
         title: "Error",
@@ -155,306 +120,202 @@ const ContactUs = () => {
       return;
     }
 
-    const updatedTickets = tickets.map((ticket) =>
-      ticket.id === selectedTicket.id
-        ? {
-            ...ticket,
-            status: "done" as TicketStatus,
-            adminComment: comment,
-            completedAt: new Date().toISOString(),
-          }
-        : ticket
-    );
+    setActionLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/${selectedTicket._id}/complete`, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({ adminComment: comment }),
+      });
+      if (!res.ok) throw new Error("Failed to complete ticket");
 
-    setTickets(updatedTickets);
-    localStorage.setItem("contact-tickets", JSON.stringify(updatedTickets));
-    
-    toast({
-      title: "Ticket completed",
-      description: "The ticket has been moved to Done.",
-    });
+      toast({ title: "Ticket completed", description: "Moved to Done." });
+      await loadTickets();
+      setIsCommentDialogOpen(false);
+      setSelectedTicket(null);
+      setComment("");
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
-    setIsCommentDialogOpen(false);
-    setSelectedTicket(null);
+  const openCommentDialog = (ticket: ContactTicket) => {
+    if (ticket.status !== "pending") {
+      toast({
+        title: "Not allowed",
+        description: "Only pending tickets can be completed.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSelectedTicket(ticket);
     setComment("");
+    setIsCommentDialogOpen(true);
   };
 
-  const getTicketsByStatus = (status: TicketStatus) => {
-    return tickets.filter((ticket) => ticket.status === status);
-  };
+  const getTicketsByStatus = (status: TicketStatus) =>
+    tickets.filter((t) => t.status === status);
 
-  // Analytics calculations
   const totalTickets = tickets.length;
-  const receivedTickets = tickets.filter((t) => t.status === "received").length;
-  const pendingTickets = tickets.filter((t) => t.status === "pending").length;
-  const completedTickets = tickets.filter((t) => t.status === "done").length;
-  
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const receivedTickets = getTicketsByStatus("received").length;
+  const pendingTickets = getTicketsByStatus("pending").length;
+  const completedTickets = getTicketsByStatus("done").length;
+
   const completedToday = tickets.filter(
-    (t) => t.status === "done" && t.completedAt && new Date(t.completedAt) >= today
+    (t) =>
+      t.status === "done" &&
+      t.completedAt &&
+      new Date(t.completedAt).toDateString() === new Date().toDateString()
   ).length;
 
   const avgResponseTime = () => {
     const completed = tickets.filter((t) => t.completedAt && t.createdAt);
-    if (completed.length === 0) return 0;
-    
-    const totalTime = completed.reduce((acc, ticket) => {
-      const created = new Date(ticket.createdAt).getTime();
-      const done = new Date(ticket.completedAt!).getTime();
-      return acc + (done - created);
+    if (!completed.length) return 0;
+    const total = completed.reduce((acc, t) => {
+      const start = new Date(t.createdAt).getTime();
+      const end = new Date(t.completedAt!).getTime();
+      return acc + (end - start);
     }, 0);
-    
-    const avgMs = totalTime / completed.length;
-    return Math.round(avgMs / (1000 * 60 * 60)); // Convert to hours
+    return Math.round(total / completed.length / (1000 * 60 * 60));
   };
 
   return (
     <div className="space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Contact Us Management</h1>
-          <p className="text-muted-foreground">Manage customer inquiries and support tickets</p>
+      <h1 className="text-3xl font-bold">Contact Us Management</h1>
+
+      {loading && (
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="animate-spin w-8 h-8 text-muted-foreground" />
         </div>
-      </div>
+      )}
 
-      {/* Analytics KPIs */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Tickets</CardTitle>
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalTickets}</div>
-            <p className="text-xs text-muted-foreground">All time inquiries</p>
-          </CardContent>
+      {error && !loading && (
+        <Card className="bg-red-50 border-red-200 p-4 flex flex-col items-center gap-2">
+          <AlertCircle className="w-6 h-6 text-red-500" />
+          <p className="text-red-700">{error}</p>
+          <Button onClick={loadTickets}>Try Again</Button>
         </Card>
+      )}
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completed Today</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{completedToday}</div>
-            <p className="text-xs text-muted-foreground">Resolved today</p>
-          </CardContent>
+      {!loading && !error && tickets.length === 0 && (
+        <Card className="bg-yellow-50 border-yellow-200 p-4 flex flex-col items-center gap-2">
+          <p>No tickets available.</p>
+          <Button onClick={loadTickets}>Refresh</Button>
         </Card>
+      )}
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{pendingTickets}</div>
-            <p className="text-xs text-muted-foreground">In progress</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Response Time</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{avgResponseTime()}h</div>
-            <p className="text-xs text-muted-foreground">Average time to resolve</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Kanban Board */}
-      <div className="grid gap-4 md:grid-cols-3">
-        {/* Received Column */}
-        <Card
-          className="border-2 border-dashed"
-          onDragOver={handleDragOver}
-          onDrop={() => handleDrop("received")}
-        >
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Mail className="h-5 w-5" />
-              Received
-            </CardTitle>
-            <CardDescription>{receivedTickets} tickets</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {getTicketsByStatus("received").map((ticket) => (
-              <Card
-                key={ticket.id}
-                className="cursor-grab active:cursor-grabbing"
-                draggable
-                onDragStart={() => handleDragStart(ticket)}
-              >
-                <CardHeader className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-1">
-                      <CardTitle className="text-sm font-medium">{ticket.name}</CardTitle>
-                      <p className="text-xs text-muted-foreground">{ticket.email}</p>
-                    </div>
-                  </div>
-                  <p className="text-sm mt-2">{ticket.message}</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Badge variant="outline" className="text-xs">
-                      {format(new Date(ticket.createdAt), "MMM d, yyyy")}
-                    </Badge>
-                  </div>
+      {!loading && !error && tickets.length > 0 && (
+        <>
+          {/* KPI Cards */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {[
+              { title: "Total Tickets", icon: MessageSquare, value: totalTickets },
+              { title: "Completed Today", icon: CheckCircle2, value: completedToday },
+              { title: "Pending", icon: Clock, value: pendingTickets },
+              { title: "Avg Response Time", icon: Calendar, value: `${avgResponseTime()}h` },
+            ].map(({ title, icon: Icon, value }) => (
+              <Card key={title}>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">{title}</CardTitle>
+                  <Icon className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{value}</div>
+                </CardContent>
               </Card>
             ))}
-            {getTicketsByStatus("received").length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                <Mail className="mx-auto h-8 w-8 mb-2 opacity-50" />
-                <p className="text-sm">No new tickets</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* Pending Column */}
-        <Card
-          className="border-2 border-dashed border-yellow-500/50"
-          onDragOver={handleDragOver}
-          onDrop={() => handleDrop("pending")}
-        >
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Pending
-            </CardTitle>
-            <CardDescription>{pendingTickets} tickets</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {getTicketsByStatus("pending").map((ticket) => (
+          {/* Kanban Board */}
+          <div className="grid gap-4 md:grid-cols-3">
+            {(["received", "pending", "done"] as TicketStatus[]).map((status) => (
               <Card
-                key={ticket.id}
-                className="cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => openCommentDialog(ticket)}
+                key={status}
+                className="border-2 border-dashed"
+                onDragOver={handleDragOver}
+                onDrop={() => handleDrop(status)}
               >
-                <CardHeader className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-1">
-                      <CardTitle className="text-sm font-medium">{ticket.name}</CardTitle>
-                      <p className="text-xs text-muted-foreground">{ticket.email}</p>
-                    </div>
-                    <Badge variant="secondary">Click to complete</Badge>
-                  </div>
-                  <p className="text-sm mt-2">{ticket.message}</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Badge variant="outline" className="text-xs">
-                      {format(new Date(ticket.createdAt), "MMM d, yyyy")}
-                    </Badge>
-                    {ticket.movedToPendingAt && (
-                      <Badge variant="outline" className="text-xs bg-yellow-500/10">
-                        In progress: {format(new Date(ticket.movedToPendingAt), "MMM d")}
-                      </Badge>
-                    )}
-                  </div>
+                <CardHeader>
+                  <CardTitle className="capitalize flex gap-2 items-center">
+                    {status === "received" && <Mail className="w-5 h-5" />}
+                    {status === "pending" && <Clock className="w-5 h-5" />}
+                    {status === "done" && <CheckCircle2 className="w-5 h-5" />}
+                    {status}
+                  </CardTitle>
+                  <CardDescription>
+                    {getTicketsByStatus(status).length} tickets
+                  </CardDescription>
                 </CardHeader>
-              </Card>
-            ))}
-            {getTicketsByStatus("pending").length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                <Clock className="mx-auto h-8 w-8 mb-2 opacity-50" />
-                <p className="text-sm">No pending tickets</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Done Column */}
-        <Card className="border-2 border-dashed border-green-500/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5" />
-              Done
-            </CardTitle>
-            <CardDescription>{completedTickets} tickets</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {getTicketsByStatus("done").map((ticket) => (
-              <Card key={ticket.id} className="opacity-75">
-                <CardHeader className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-1">
-                      <CardTitle className="text-sm font-medium">{ticket.name}</CardTitle>
-                      <p className="text-xs text-muted-foreground">{ticket.email}</p>
-                    </div>
-                    <Badge variant="default" className="bg-green-500">
-                      Completed
-                    </Badge>
-                  </div>
-                  <p className="text-sm mt-2">{ticket.message}</p>
-                  {ticket.adminComment && (
-                    <div className="mt-2 p-2 bg-muted rounded-md">
-                      <p className="text-xs font-medium">Admin Comment:</p>
-                      <p className="text-xs text-muted-foreground">{ticket.adminComment}</p>
+                <CardContent className="space-y-3">
+                  {getTicketsByStatus(status).map((t) => (
+                    <Card
+                      key={t._id}
+                      className={`cursor-${status === "received" ? "grab" : "pointer"}`}
+                      draggable={status === "received"}
+                      onDragStart={() => handleDragStart(t)}
+                      onClick={() => status === "pending" && openCommentDialog(t)}
+                    >
+                      <CardHeader className="p-4">
+                        <CardTitle className="text-sm font-medium">{t.name}</CardTitle>
+                        <p className="text-xs text-muted-foreground">{t.email}</p>
+                        <p className="text-sm mt-2">{t.message}</p>
+                        <Badge variant="outline" className="mt-2 text-xs">
+                          {format(new Date(t.createdAt), "MMM d, yyyy")}
+                        </Badge>
+                        {t.adminComment && (
+                          <div className="mt-2 text-xs bg-muted p-2 rounded">
+                            <strong>Admin Comment:</strong> {t.adminComment}
+                          </div>
+                        )}
+                      </CardHeader>
+                    </Card>
+                  ))}
+                  {getTicketsByStatus(status).length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground text-sm">
+                      No {status} tickets
                     </div>
                   )}
-                  <div className="flex items-center gap-2 mt-2">
-                    <Badge variant="outline" className="text-xs">
-                      Created: {format(new Date(ticket.createdAt), "MMM d")}
-                    </Badge>
-                    {ticket.completedAt && (
-                      <Badge variant="outline" className="text-xs bg-green-500/10">
-                        Completed: {format(new Date(ticket.completedAt), "MMM d")}
-                      </Badge>
-                    )}
-                  </div>
-                </CardHeader>
+                </CardContent>
               </Card>
             ))}
-            {getTicketsByStatus("done").length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                <CheckCircle2 className="mx-auto h-8 w-8 mb-2 opacity-50" />
-                <p className="text-sm">No completed tickets</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </>
+      )}
 
       {/* Comment Dialog */}
       <Dialog open={isCommentDialogOpen} onOpenChange={setIsCommentDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Complete Ticket</DialogTitle>
-            <DialogDescription>
-              Add a comment to complete this ticket and move it to Done
-            </DialogDescription>
+            <DialogDescription>Add your resolution comment below.</DialogDescription>
           </DialogHeader>
           {selectedTicket && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Customer: {selectedTicket.name}</p>
-                <p className="text-sm text-muted-foreground">Email: {selectedTicket.email}</p>
-                <div className="p-3 bg-muted rounded-md">
-                  <p className="text-sm">{selectedTicket.message}</p>
-                </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Admin Comment</label>
+            <>
+              <div className="space-y-3">
+                <p className="text-sm">
+                  <strong>{selectedTicket.name}</strong> – {selectedTicket.email}
+                </p>
+                <p className="text-sm bg-muted p-2 rounded">{selectedTicket.message}</p>
                 <Textarea
-                  placeholder="Add your response or resolution notes..."
+                  placeholder="Add comment..."
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                   rows={4}
-                  className="mt-2"
                 />
               </div>
-            </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCommentDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={submitComment} disabled={actionLoading}>
+                  {actionLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Complete Ticket
+                </Button>
+              </DialogFooter>
+            </>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCommentDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={submitComment}>
-              <CheckCircle2 className="mr-2 h-4 w-4" />
-              Complete Ticket
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
