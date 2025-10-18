@@ -33,6 +33,13 @@ const productSchema = z.object({
   ),
   images: z.array(z.string()),
   videos: z.array(z.string()),
+  labReports: z.array(
+    z.object({
+      title: z.string().min(1, "Lab report title is required"),
+      description: z.string(),
+      file: z.string().min(1, "Lab report file is required"),
+    })
+  ),
   aboutItem: z.string().min(1, "About item is required"),
   technicalDetails: z.array(
     z.object({
@@ -59,6 +66,7 @@ export default function AddProduct() {
   const [aboutItemContent, setAboutItemContent] = useState("");
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [videoPreviews, setVideoPreviews] = useState<string[]>([]);
+  const [labReportPreviews, setLabReportPreviews] = useState<{ title: string; description: string; file: string; fileName: string }[]>([]);
 
   const {
     register,
@@ -73,6 +81,7 @@ export default function AddProduct() {
       coupons: [],
       images: [],
       videos: [],
+      labReports: [],
       technicalDetails: [{ key: "", value: "" }],
       additionalInfo: [{ key: "", value: "" }],
     },
@@ -96,6 +105,11 @@ export default function AddProduct() {
   const { fields: additionalFields, append: appendAdditional, remove: removeAdditional } = useFieldArray({
     control,
     name: "additionalInfo",
+  });
+
+  const { fields: labReportFields, append: appendLabReport, remove: removeLabReport } = useFieldArray({
+    control,
+    name: "labReports",
   });
 
   const onSubmit = async (data: ProductForm) => {
@@ -180,6 +194,31 @@ export default function AddProduct() {
     setVideoPreviews(newVideos);
     setValue("videos", newVideos);
     toast.success("Video removed");
+  };
+
+  const handleLabReportUpload = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const fileUrl = URL.createObjectURL(file);
+      const currentReports = labReportPreviews;
+      const title = (document.getElementById(`labReport-title-${index}`) as HTMLInputElement)?.value || "";
+      const description = (document.getElementById(`labReport-description-${index}`) as HTMLTextAreaElement)?.value || "";
+      
+      const newReport = { title, description, file: fileUrl, fileName: file.name };
+      const updatedReports = [...currentReports];
+      updatedReports[index] = newReport;
+      
+      setLabReportPreviews(updatedReports);
+      setValue(`labReports.${index}.file`, fileUrl);
+      toast.success("Lab report uploaded");
+    }
+  };
+
+  const handleRemoveLabReport = (index: number) => {
+    const newReports = labReportPreviews.filter((_, i) => i !== index);
+    setLabReportPreviews(newReports);
+    removeLabReport(index);
+    toast.success("Lab report removed");
   };
 
   return (
@@ -431,6 +470,77 @@ export default function AddProduct() {
                 </div>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Lab Reports</CardTitle>
+            <CardDescription>Upload product lab test reports and certifications</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {labReportFields.map((field, index) => (
+              <div key={field.id} className="space-y-4 p-4 border rounded-lg">
+                <div className="space-y-2">
+                  <Label htmlFor={`labReport-title-${index}`}>Report Title *</Label>
+                  <Input
+                    id={`labReport-title-${index}`}
+                    {...register(`labReports.${index}.title`)}
+                    placeholder="e.g., Third-Party Lab Test Certificate"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor={`labReport-description-${index}`}>Description</Label>
+                  <Textarea
+                    id={`labReport-description-${index}`}
+                    {...register(`labReports.${index}.description`)}
+                    placeholder="Brief description of the lab report..."
+                    rows={2}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor={`labReport-file-${index}`}>Upload Report *</Label>
+                  <div className="flex items-center gap-4">
+                    <Input
+                      id={`labReport-file-${index}`}
+                      type="file"
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                      onChange={(e) => handleLabReportUpload(e, index)}
+                      className="flex-1"
+                    />
+                    <Button type="button" variant="outline" size="icon">
+                      <Upload className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {labReportPreviews[index] && (
+                    <p className="text-sm text-muted-foreground">
+                      Uploaded: {labReportPreviews[index].fileName}
+                    </p>
+                  )}
+                </div>
+
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => handleRemoveLabReport(index)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Remove Report
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => appendLabReport({ title: "", description: "", file: "" })}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Lab Report
+            </Button>
           </CardContent>
         </Card>
 
