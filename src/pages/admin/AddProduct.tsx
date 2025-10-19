@@ -63,61 +63,61 @@ type ProductForm = z.infer<typeof productSchema>;
 export default function AddProduct() {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [aboutItemContent, setAboutItemContent] = useState("");
+  const [aboutItem, setAboutItem] = useState("");
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [videoPreviews, setVideoPreviews] = useState<string[]>([]);
   const [labReportPreviews, setLabReportPreviews] = useState<{ title: string; description: string; file: string; fileName: string }[]>([]);
   const { token } = useAuth();
   const uploadFileToServer = async (file: File): Promise<string | null> => {
-  const formData = new FormData();
-  formData.append("file", file);
+    const formData = new FormData();
+    formData.append("file", file);
 
-  try {
-    toast.loading(`Uploading ${file.name}...`, { id: file.name });
+    try {
+      toast.loading(`Uploading ${file.name}...`, { id: file.name });
 
-    const res = await fetch("https://api.villorya.com/api/v1/product/upload", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: formData,
-    });
+      const res = await fetch("https://api.villorya.com/api/v1/product/upload", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
 
-    const data = await res.json();
-    toast.dismiss(file.name);
+      const data = await res.json();
+      toast.dismiss(file.name);
 
-    if (!data.success) {
-      toast.error(data.message || `${file.name} failed to upload`);
+      if (!data.success) {
+        toast.error(data.message || `${file.name} failed to upload`);
+        return null;
+      }
+
+      toast.success(`${file.name} uploaded successfully`);
+      return data.fileUrl;
+    } catch (err) {
+      console.error("Upload error:", err);
+      toast.dismiss(file.name);
+      toast.error(`${file.name} failed to upload`);
       return null;
     }
+  };
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
 
-    toast.success(`${file.name} uploaded successfully`);
-    return data.fileUrl;
-  } catch (err) {
-    console.error("Upload error:", err);
-    toast.dismiss(file.name);
-    toast.error(`${file.name} failed to upload`);
-    return null;
-  }
-};
-const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const files = e.target.files;
-  if (!files) return;
+    const uploadedUrls: string[] = [];
 
-  const uploadedUrls: string[] = [];
+    for (const file of Array.from(files)) {
+      const url = await uploadFileToServer(file);
+      if (url) uploadedUrls.push(url);
+    }
 
-  for (const file of Array.from(files)) {
-    const url = await uploadFileToServer(file);
-    if (url) uploadedUrls.push(url);
-  }
-
-  if (uploadedUrls.length > 0) {
-    const allImages = [...imagePreviews, ...uploadedUrls];
-    setImagePreviews(allImages);
-    setValue("images", allImages);
-    toast.success(`${uploadedUrls.length} image(s) uploaded`);
-  }
-};
+    if (uploadedUrls.length > 0) {
+      const allImages = [...imagePreviews, ...uploadedUrls];
+      setImagePreviews(allImages);
+      setValue("images", allImages);
+      toast.success(`${uploadedUrls.length} image(s) uploaded`);
+    }
+  };
 
   const {
     register,
@@ -137,6 +137,7 @@ const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       additionalInfo: [{ key: "", value: "" }],
     },
   });
+
 
   const { fields: quantityFields, append: appendQuantity, remove: removeQuantity } = useFieldArray({
     control,
@@ -163,43 +164,45 @@ const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     name: "labReports",
   });
 
-const onSubmit = async (data: ProductForm) => {
-  setIsSubmitting(true);
+  const onSubmit = async (data: ProductForm) => {
+    setIsSubmitting(true);
+    debugger;
 
-  try {
-    // Prepare the product payload
-    const productData = { 
-      ...data, 
-      aboutItem: aboutItemContent,
-    };
+    try {
+      // Prepare the product payload
+      const productData = {
+        ...data,
+        aboutItem: aboutItem,
+      };
 
-    const res = await fetch("https://api.villorya.com/api/v1/product", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`, // ✅ secure auth
-      },
-      body: JSON.stringify(productData),
-    });
+      const res = await fetch("https://api.villorya.com/api/v1/product", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`, // ✅ secure auth
+        },
+        body: JSON.stringify(productData),
+      });
 
-    const result = await res.json();
+      const result = await res.json();
 
-    if (!res.ok || !result.success) {
-      throw new Error(result.message || "Failed to create product");
+      if (!res.ok || !result.success) {
+        throw new Error(result.message || "Failed to create product");
+      }
+
+      toast.success("✅ Product created successfully");
+      navigate("/admin/products");
+    } catch (error: any) {
+      console.error("❌ Product creation failed:", error);
+      toast.error(error.message || "Something went wrong while creating the product");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    toast.success("✅ Product created successfully");
-    navigate("/admin/products");
-  } catch (error: any) {
-    console.error("❌ Product creation failed:", error);
-    toast.error(error.message || "Something went wrong while creating the product");
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  };
 
 
   const onError = (errors: any) => {
+    debugger
     const errorFields = Object.keys(errors);
     if (errorFields.length > 0) {
       const firstError = errors[errorFields[0]];
@@ -207,11 +210,11 @@ const onSubmit = async (data: ProductForm) => {
         .replace(/([A-Z])/g, ' $1')
         .replace(/^./, (str) => str.toUpperCase())
         .trim();
-      
+
       toast.error(`Please check: ${fieldName}`, {
         description: firstError.message || "This field has an error"
       });
-      
+
       // Show additional errors if multiple
       if (errorFields.length > 1) {
         toast.error(`${errorFields.length - 1} more field(s) need attention`);
@@ -219,41 +222,41 @@ const onSubmit = async (data: ProductForm) => {
     }
   };
 
-const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const files = e.target.files;
-  if (!files) return;
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
 
-  const uploadedUrls: string[] = [];
+    const uploadedUrls: string[] = [];
 
-  for (const file of Array.from(files)) {
+    for (const file of Array.from(files)) {
+      const url = await uploadFileToServer(file);
+      if (url) uploadedUrls.push(url);
+    }
+
+    if (uploadedUrls.length > 0) {
+      const allVideos = [...videoPreviews, ...uploadedUrls];
+      setVideoPreviews(allVideos);
+      setValue("videos", allVideos);
+      toast.success(`${uploadedUrls.length} video(s) uploaded`);
+    }
+  };
+  const handleLabReportUpload = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
     const url = await uploadFileToServer(file);
-    if (url) uploadedUrls.push(url);
-  }
+    if (!url) return;
 
-  if (uploadedUrls.length > 0) {
-    const allVideos = [...videoPreviews, ...uploadedUrls];
-    setVideoPreviews(allVideos);
-    setValue("videos", allVideos);
-    toast.success(`${uploadedUrls.length} video(s) uploaded`);
-  }
-};
-const handleLabReportUpload = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
+    const title = (document.getElementById(`labReport-title-${index}`) as HTMLInputElement)?.value || "";
+    const description = (document.getElementById(`labReport-description-${index}`) as HTMLTextAreaElement)?.value || "";
 
-  const url = await uploadFileToServer(file);
-  if (!url) return;
+    const updatedReports = [...labReportPreviews];
+    updatedReports[index] = { title, description, file: url, fileName: file.name };
 
-  const title = (document.getElementById(`labReport-title-${index}`) as HTMLInputElement)?.value || "";
-  const description = (document.getElementById(`labReport-description-${index}`) as HTMLTextAreaElement)?.value || "";
-
-  const updatedReports = [...labReportPreviews];
-  updatedReports[index] = { title, description, file: url, fileName: file.name };
-
-  setLabReportPreviews(updatedReports);
-  setValue(`labReports.${index}.file`, url);
-  toast.success("Lab report uploaded successfully");
-};
+    setLabReportPreviews(updatedReports);
+    setValue(`labReports.${index}.file`, url);
+    toast.success("Lab report uploaded successfully");
+  };
 
   const removeImage = (index: number) => {
     const newImages = imagePreviews.filter((_, i) => i !== index);
@@ -437,7 +440,7 @@ const handleLabReportUpload = async (e: React.ChangeEvent<HTMLInputElement>, ind
                   <Upload className="h-4 w-4" />
                 </Button>
               </div>
-              
+
               {imagePreviews.length > 0 && (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4">
                   {imagePreviews.map((image, index) => (
@@ -490,7 +493,7 @@ const handleLabReportUpload = async (e: React.ChangeEvent<HTMLInputElement>, ind
                   <Upload className="h-4 w-4" />
                 </Button>
               </div>
-              
+
               {videoPreviews.length > 0 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                   {videoPreviews.map((video, index) => (
@@ -544,7 +547,7 @@ const handleLabReportUpload = async (e: React.ChangeEvent<HTMLInputElement>, ind
                     placeholder="e.g., Third-Party Lab Test Certificate"
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor={`labReport-description-${index}`}>Description</Label>
                   <Textarea
@@ -606,8 +609,11 @@ const handleLabReportUpload = async (e: React.ChangeEvent<HTMLInputElement>, ind
           </CardHeader>
           <CardContent>
             <RichTextEditor
-              value={aboutItemContent}
-              onChange={setAboutItemContent}
+              value={aboutItem}
+              onChange={(value) => {
+                setAboutItem(value);
+                setValue("aboutItem", value, { shouldValidate: true });
+              }}
               placeholder="Describe the product features, benefits, and details..."
             />
           </CardContent>
