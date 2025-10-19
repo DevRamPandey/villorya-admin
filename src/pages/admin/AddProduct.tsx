@@ -12,7 +12,7 @@ import { RichTextEditor } from "@/components/cms/RichTextEditor";
 import { ArrowLeft, Plus, Trash2, Upload, Loader2, X, ImageIcon, Video } from "lucide-react";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
-
+import { useAuth } from "@/hooks/use-auth";
 const productSchema = z.object({
   title: z.string().min(1, "Title is required"),
   variety: z.string().min(1, "Variety is required"),
@@ -67,6 +67,57 @@ export default function AddProduct() {
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [videoPreviews, setVideoPreviews] = useState<string[]>([]);
   const [labReportPreviews, setLabReportPreviews] = useState<{ title: string; description: string; file: string; fileName: string }[]>([]);
+  const { token } = useAuth();
+  const uploadFileToServer = async (file: File): Promise<string | null> => {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  try {
+    toast.loading(`Uploading ${file.name}...`, { id: file.name });
+
+    const res = await fetch("https://api.villorya.com/api/v1/product/upload", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    const data = await res.json();
+    toast.dismiss(file.name);
+
+    if (!data.success) {
+      toast.error(data.message || `${file.name} failed to upload`);
+      return null;
+    }
+
+    toast.success(`${file.name} uploaded successfully`);
+    return data.fileUrl;
+  } catch (err) {
+    console.error("Upload error:", err);
+    toast.dismiss(file.name);
+    toast.error(`${file.name} failed to upload`);
+    return null;
+  }
+};
+const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const files = e.target.files;
+  if (!files) return;
+
+  const uploadedUrls: string[] = [];
+
+  for (const file of Array.from(files)) {
+    const url = await uploadFileToServer(file);
+    if (url) uploadedUrls.push(url);
+  }
+
+  if (uploadedUrls.length > 0) {
+    const allImages = [...imagePreviews, ...uploadedUrls];
+    setImagePreviews(allImages);
+    setValue("images", allImages);
+    toast.success(`${uploadedUrls.length} image(s) uploaded`);
+  }
+};
 
   const {
     register,
@@ -112,33 +163,41 @@ export default function AddProduct() {
     name: "labReports",
   });
 
-  const onSubmit = async (data: ProductForm) => {
-    setIsSubmitting(true);
-    try {
-      const productData = { 
-        ...data, 
-        aboutItem: aboutItemContent,
-        id: Date.now().toString(),
-        createdAt: new Date().toISOString()
-      };
-      
-      // Get existing products from localStorage
-      const existingProducts = JSON.parse(localStorage.getItem('products') || '[]');
-      
-      // Add new product
-      existingProducts.push(productData);
-      
-      // Save to localStorage
-      localStorage.setItem('products', JSON.stringify(existingProducts));
-      
-      toast.success("Product created successfully");
-      navigate("/admin/products");
-    } catch (error) {
-      toast.error("Failed to create product");
-    } finally {
-      setIsSubmitting(false);
+const onSubmit = async (data: ProductForm) => {
+  setIsSubmitting(true);
+
+  try {
+    // Prepare the product payload
+    const productData = { 
+      ...data, 
+      aboutItem: aboutItemContent,
+    };
+
+    const res = await fetch("https://api.villorya.com/api/v1/product", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`, // ✅ secure auth
+      },
+      body: JSON.stringify(productData),
+    });
+
+    const result = await res.json();
+
+    if (!res.ok || !result.success) {
+      throw new Error(result.message || "Failed to create product");
     }
-  };
+
+    toast.success("✅ Product created successfully");
+    navigate("/admin/products");
+  } catch (error: any) {
+    console.error("❌ Product creation failed:", error);
+    toast.error(error.message || "Something went wrong while creating the product");
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
 
   const onError = (errors: any) => {
     const errorFields = Object.keys(errors);
@@ -160,27 +219,41 @@ export default function AddProduct() {
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) {
-      const imageUrls = Array.from(files).map((file) => URL.createObjectURL(file));
-      const allImages = [...imagePreviews, ...imageUrls];
-      setImagePreviews(allImages);
-      setValue("images", allImages);
-      toast.success(`${files.length} image(s) added`);
-    }
-  };
+const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const files = e.target.files;
+  if (!files) return;
 
-  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) {
-      const videoUrls = Array.from(files).map((file) => URL.createObjectURL(file));
-      const allVideos = [...videoPreviews, ...videoUrls];
-      setVideoPreviews(allVideos);
-      setValue("videos", allVideos);
-      toast.success(`${files.length} video(s) added`);
-    }
-  };
+  const uploadedUrls: string[] = [];
+
+  for (const file of Array.from(files)) {
+    const url = await uploadFileToServer(file);
+    if (url) uploadedUrls.push(url);
+  }
+
+  if (uploadedUrls.length > 0) {
+    const allVideos = [...videoPreviews, ...uploadedUrls];
+    setVideoPreviews(allVideos);
+    setValue("videos", allVideos);
+    toast.success(`${uploadedUrls.length} video(s) uploaded`);
+  }
+};
+const handleLabReportUpload = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  const url = await uploadFileToServer(file);
+  if (!url) return;
+
+  const title = (document.getElementById(`labReport-title-${index}`) as HTMLInputElement)?.value || "";
+  const description = (document.getElementById(`labReport-description-${index}`) as HTMLTextAreaElement)?.value || "";
+
+  const updatedReports = [...labReportPreviews];
+  updatedReports[index] = { title, description, file: url, fileName: file.name };
+
+  setLabReportPreviews(updatedReports);
+  setValue(`labReports.${index}.file`, url);
+  toast.success("Lab report uploaded successfully");
+};
 
   const removeImage = (index: number) => {
     const newImages = imagePreviews.filter((_, i) => i !== index);
@@ -194,24 +267,6 @@ export default function AddProduct() {
     setVideoPreviews(newVideos);
     setValue("videos", newVideos);
     toast.success("Video removed");
-  };
-
-  const handleLabReportUpload = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const fileUrl = URL.createObjectURL(file);
-      const currentReports = labReportPreviews;
-      const title = (document.getElementById(`labReport-title-${index}`) as HTMLInputElement)?.value || "";
-      const description = (document.getElementById(`labReport-description-${index}`) as HTMLTextAreaElement)?.value || "";
-      
-      const newReport = { title, description, file: fileUrl, fileName: file.name };
-      const updatedReports = [...currentReports];
-      updatedReports[index] = newReport;
-      
-      setLabReportPreviews(updatedReports);
-      setValue(`labReports.${index}.file`, fileUrl);
-      toast.success("Lab report uploaded");
-    }
   };
 
   const handleRemoveLabReport = (index: number) => {
