@@ -179,7 +179,7 @@ export default function AddProduct() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`, // ✅ secure auth
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(productData),
       });
@@ -190,10 +190,10 @@ export default function AddProduct() {
         throw new Error(result.message || "Failed to create product");
       }
 
-      toast.success("✅ Product created successfully");
+      toast.success("Product created successfully");
       navigate("/admin/products");
     } catch (error: any) {
-      console.error("❌ Product creation failed:", error);
+      console.error("Product creation failed:", error);
       toast.error(error.message || "Something went wrong while creating the product");
     } finally {
       setIsSubmitting(false);

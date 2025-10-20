@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,9 +17,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useAuth } from "@/hooks/use-auth";
 
 interface Product {
-  id: string;
+  _id: string;
   title: string;
   variety: string;
   itemForm: string;
@@ -35,22 +36,10 @@ export default function Products() {
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<string | null>(null);
+  const {token}=useAuth();
 
   // Mock products data - replace with actual API call
   const [products, setProducts] = useState<Product[]>([
-    {
-      id: "1",
-      title: "Organic Turmeric Powder",
-      variety: "Turmeric",
-      itemForm: "Powder",
-      dietType: "Vegan",
-      netQuantities: [
-        { quantity: "100g", price: 99 },
-        { quantity: "200g", price: 189 },
-      ],
-      images: ["/placeholder.svg"],
-      useBy: "2026-01-12",
-    },
   ]);
 
   const filteredProducts = products.filter((product) =>
@@ -62,14 +51,60 @@ export default function Products() {
     setDeleteDialogOpen(true);
   };
 
-  const confirmDelete = () => {
-    if (productToDelete) {
-      setProducts(products.filter((p) => p.id !== productToDelete));
-      toast.success("Product deleted successfully");
+const confirmDelete = async () => {
+    if (!productToDelete) return;
+
+    try {
+      setIsLoading(true);
+
+      const res = await fetch(`https://api.villorya.com/api/v1/product/${productToDelete}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setProducts(products.filter((p) => p._id !== productToDelete));
+        toast.success("Product deleted successfully");
+      } else {
+        toast.error(data.message || "Failed to delete product");
+      }
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast.error("Something went wrong while deleting product");
+    } finally {
+      setIsLoading(false);
       setDeleteDialogOpen(false);
       setProductToDelete(null);
     }
   };
+
+   useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setIsLoading(true);
+        const res = await fetch("https://api.villorya.com/api/v1/product");
+        const data = await res.json();
+
+        if (data.success) {
+          setProducts(data.products);
+        } else {
+          toast.error("Failed to fetch products");
+        }
+      } catch (error) {
+        console.error("Error fetching products:", error);
+        toast.error("Something went wrong while fetching products");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
 
   return (
     <div className="space-y-6">
@@ -124,7 +159,7 @@ export default function Products() {
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {filteredProducts.map((product) => (
-            <Card key={product.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+            <Card key={product._id} className="overflow-hidden hover:shadow-lg transition-shadow">
               <div className="aspect-square overflow-hidden bg-muted">
                 <img
                   src={product.images[0]}
@@ -153,7 +188,7 @@ export default function Products() {
                     variant="outline"
                     size="sm"
                     className="flex-1"
-                    onClick={() => navigate(`/admin/products/${product.id}`)}
+                    onClick={() => navigate(`/admin/products/${product._id}`)}
                   >
                     <Eye className="mr-2 h-4 w-4" />
                     View
@@ -161,14 +196,14 @@ export default function Products() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => navigate(`/admin/products/edit/${product.id}`)}
+                    onClick={() => navigate(`/admin/products/edit/${product._id}`)}
                   >
                     <Edit className="h-4 w-4" />
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleDelete(product.id)}
+                    onClick={() => handleDelete(product._id)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
