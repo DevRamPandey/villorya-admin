@@ -17,6 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
+import { useAuth } from "@/hooks/use-auth";
 
 interface ProductDetail {
   id: string;
@@ -45,49 +46,24 @@ export default function ProductDetails() {
   const [product, setProduct] = useState<ProductDetail | null>(null);
 
   useEffect(() => {
-    const fetchProduct = async () => {
-      setIsLoading(true);
-      try {
-        // Mock data - replace with actual API call
-        const mockProduct: ProductDetail = {
-          id: "1",
-          title: "Organic Turmeric Powder",
-          variety: "Turmeric",
-          itemForm: "Powder",
-          dietType: "Vegan",
-          useBy: "2026-01-12",
-          netQuantities: [
-            { quantity: "100g", price: 99 },
-            { quantity: "200g", price: 189 },
-          ],
-          coupons: [{ code: "SAVE10", discount: 10 }],
-          images: ["/placeholder.svg"],
-          videos: [],
-          aboutItem: "<p>High quality organic turmeric with numerous health benefits.</p>",
-          technicalDetails: [
-            { key: "Weight", value: "200 Kilograms" },
-            { key: "Brand", value: "Tata Sampann" },
-            { key: "Specialty", value: "No Preservative" },
-            { key: "Form", value: "Powder" },
-            { key: "Package Information", value: "Bag" },
-          ],
-          additionalInfo: [
-            { key: "ASIN", value: "B079H8D8M6" },
-            { key: "Customer Reviews", value: "4.5 out of 5 stars" },
-            { key: "Best Sellers Rank", value: "#63 in Grocery & Gourmet Foods" },
-          ],
-          ingredients: "Turmeric",
-          legalDisclaimer: "Actual product packaging and materials may contain more information.",
-          productDescription: "Tata Sampann's range of spices are crafted not just to satisfy your taste buds but also to take care of your health.",
-        };
+  const fetchProduct = async () => {
+  setIsLoading(true);
+  try {
+    const res = await fetch(`https://api.villorya.com/api/v1/product/${id}`);
+    const data = await res.json();
 
-        setProduct(mockProduct);
-      } catch (error) {
-        toast.error("Failed to load product details");
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    if (data.success) {
+      setProduct(data.product);
+    } else {
+      toast.error("Failed to load product details");
+    }
+  } catch (error) {
+    console.error(error);
+    toast.error("Something went wrong while fetching product details");
+  } finally {
+    setIsLoading(false);
+  }
+};
 
     fetchProduct();
   }, [id]);
@@ -95,11 +71,31 @@ export default function ProductDetails() {
   const handleDelete = () => {
     setDeleteDialogOpen(true);
   };
+ const {token}=useAuth();
+ const confirmDelete = async () => {
+  try {
+    const res = await fetch(`https://api.villorya.com/api/v1/product/${id}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
-  const confirmDelete = () => {
-    toast.success("Product deleted successfully");
-    navigate("/admin/products");
-  };
+    const data = await res.json();
+
+    if (data.success) {
+      toast.success("Product deleted successfully");
+      navigate("/admin/products");
+    } else {
+      toast.error(data.message || "Failed to delete product");
+    }
+  } catch (error) {
+    console.error("Delete error:", error);
+    toast.error("Something went wrong while deleting product");
+  } finally {
+    setDeleteDialogOpen(false);
+  }
+};
 
   if (isLoading) {
     return (

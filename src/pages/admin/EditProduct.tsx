@@ -9,9 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RichTextEditor } from "@/components/cms/RichTextEditor";
-import { ArrowLeft, Plus, Trash2, Upload, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Upload, Loader2, Video, X, ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/hooks/use-auth";
 
 const productSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -31,8 +32,15 @@ const productSchema = z.object({
       discount: z.number().min(0, "Discount must be positive"),
     })
   ),
-  images: z.array(z.string()).min(1, "At least one image is required"),
+  images: z.array(z.string()),
   videos: z.array(z.string()),
+  labReports: z.array(
+    z.object({
+      title: z.string().min(1, "Lab report title is required"),
+      description: z.string(),
+      file: z.string().min(1, "Lab report file is required"),
+    })
+  ),
   aboutItem: z.string().min(1, "About item is required"),
   technicalDetails: z.array(
     z.object({
@@ -59,7 +67,10 @@ export default function EditProduct() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [aboutItemContent, setAboutItemContent] = useState("");
-
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [videoPreviews, setVideoPreviews] = useState<string[]>([]);
+  const [labReportPreviews, setLabReportPreviews] = useState<{ title: string; description: string; file: string; fileName: string }[]>([]);
+ 
   const {
     register,
     handleSubmit,
@@ -91,77 +102,175 @@ export default function EditProduct() {
     name: "additionalInfo",
   });
 
-  useEffect(() => {
-    // Simulate API call to fetch product
-    const fetchProduct = async () => {
-      setIsLoading(true);
-      try {
-        // Mock data - replace with actual API call
-        const mockProduct = {
-          title: "Organic Turmeric Powder",
-          variety: "Turmeric",
-          itemForm: "Powder",
-          dietType: "Vegan",
-          useBy: "2026-01-12",
-          netQuantities: [
-            { quantity: "100g", price: 99 },
-            { quantity: "200g", price: 189 },
-          ],
-          coupons: [{ code: "SAVE10", discount: 10 }],
-          images: ["/placeholder.svg"],
-          videos: [],
-          aboutItem: "<p>High quality organic turmeric</p>",
-          technicalDetails: [
-            { key: "Weight", value: "200g" },
-            { key: "Brand", value: "Tata Sampann" },
-          ],
-          additionalInfo: [{ key: "ASIN", value: "B079H8D8M6" }],
-          ingredients: "Turmeric",
-          legalDisclaimer: "Actual product may vary",
-          productDescription: "Premium organic turmeric powder",
-        };
+   const { fields: labReportFields, append: appendLabReport, remove: removeLabReport } = useFieldArray({
+    control,
+    name: "labReports",
+  });
 
-        reset(mockProduct);
-        setAboutItemContent(mockProduct.aboutItem);
-      } catch (error) {
-        toast.error("Failed to load product");
-      } finally {
-        setIsLoading(false);
-      }
+   const removeImage = (index: number) => {
+      const newImages = imagePreviews.filter((_, i) => i !== index);
+      setImagePreviews(newImages);
+      setValue("images", newImages);
+      toast.success("Image removed");
+    };
+  
+    const removeVideo = (index: number) => {
+      const newVideos = videoPreviews.filter((_, i) => i !== index);
+      setVideoPreviews(newVideos);
+      setValue("videos", newVideos);
+      toast.success("Video removed");
+    };
+  
+    const handleRemoveLabReport = (index: number) => {
+      const newReports = labReportPreviews.filter((_, i) => i !== index);
+      setLabReportPreviews(newReports);
+      removeLabReport(index);
+      toast.success("Lab report removed");
     };
 
-    fetchProduct();
-  }, [id, reset]);
+useEffect(() => {
+  const fetchProduct = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`https://api.villorya.com/api/v1/product/${id}`);
+      const data = await res.json();
+
+      if (data.success && data.product) {
+        reset(data.product);
+        setAboutItemContent(data.product.aboutItem || "");
+      } else {
+        toast.error(data.message || "Failed to load product");
+      }
+    } catch (error) {
+      console.error("Error fetching product:", error);
+      toast.error("Something went wrong while fetching product");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  fetchProduct();
+}, [id, reset]);
+
+const {token}=useAuth();
 
   const onSubmit = async (data: ProductForm) => {
-    setIsSubmitting(true);
-    try {
-      // API call to update product
-      console.log({ ...data, aboutItem: aboutItemContent });
+  setIsSubmitting(true);
+  try {
+    const payload = { ...data, aboutItem: aboutItemContent };
+
+    const res = await fetch(`https://api.villorya.com/api/v1/product/${id}`, {
+      method: "PUT", // using PUT to update
+      headers: {
+        "Content-Type": "application/json",
+        // Add auth token if required, e.g.:
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const result = await res.json();
+
+    if (result.success) {
       toast.success("Product updated successfully");
       navigate("/admin/products");
-    } catch (error) {
-      toast.error("Failed to update product");
-    } finally {
-      setIsSubmitting(false);
+    } else {
+      toast.error(result.message || "Failed to update product");
+    }
+  } catch (error) {
+    console.error("Error updating product:", error);
+    toast.error("Something went wrong while updating the product");
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
+
+
+  const uploadFileToServer = async (file: File): Promise<string | null> => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      toast.loading(`Uploading ${file.name}...`, { id: file.name });
+
+      const res = await fetch("https://api.villorya.com/api/v1/product/upload", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await res.json();
+      toast.dismiss(file.name);
+
+      if (!data.success) {
+        toast.error(data.message || `${file.name} failed to upload`);
+        return null;
+      }
+
+      toast.success(`${file.name} uploaded successfully`);
+      return data.fileUrl;
+    } catch (err) {
+      console.error("Upload error:", err);
+      toast.dismiss(file.name);
+      toast.error(`${file.name} failed to upload`);
+      return null;
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleLabReportUpload = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+  
+      const url = await uploadFileToServer(file);
+      if (!url) return;
+  
+      const title = (document.getElementById(`labReport-title-${index}`) as HTMLInputElement)?.value || "";
+      const description = (document.getElementById(`labReport-description-${index}`) as HTMLTextAreaElement)?.value || "";
+  
+      const updatedReports = [...labReportPreviews];
+      updatedReports[index] = { title, description, file: url, fileName: file.name };
+  
+      setLabReportPreviews(updatedReports);
+      setValue(`labReports.${index}.file`, url);
+      toast.success("Lab report uploaded successfully");
+    };
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files) {
-      // Handle image upload logic
-      const imageUrls = Array.from(files).map((file) => URL.createObjectURL(file));
-      setValue("images", imageUrls);
+    if (!files) return;
+
+    const uploadedUrls: string[] = [];
+
+    for (const file of Array.from(files)) {
+      const url = await uploadFileToServer(file);
+      if (url) uploadedUrls.push(url);
+    }
+
+    if (uploadedUrls.length > 0) {
+      const allImages = [...imagePreviews, ...uploadedUrls];
+      setImagePreviews(allImages);
+      setValue("images", allImages);
+      toast.success(`${uploadedUrls.length} image(s) uploaded`);
     }
   };
-
-  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files) {
-      // Handle video upload logic
-      const videoUrls = Array.from(files).map((file) => URL.createObjectURL(file));
-      setValue("videos", videoUrls);
+    if (!files) return;
+
+    const uploadedUrls: string[] = [];
+
+    for (const file of Array.from(files)) {
+      const url = await uploadFileToServer(file);
+      if (url) uploadedUrls.push(url);
+    }
+
+    if (uploadedUrls.length > 0) {
+      const allVideos = [...videoPreviews, ...uploadedUrls];
+      setVideoPreviews(allVideos);
+      setValue("videos", allVideos);
+      toast.success(`${uploadedUrls.length} video(s) uploaded`);
     }
   };
 
@@ -343,6 +452,39 @@ export default function EditProduct() {
                 <Upload className="h-4 w-4 text-muted-foreground" />
               </div>
               {errors.images && <p className="text-sm text-destructive">{errors.images.message}</p>}
+                {imagePreviews.length > 0 && (
+                              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4">
+                                {imagePreviews.map((image, index) => (
+                                  <div
+                                    key={index}
+                                    className="relative group rounded-lg overflow-hidden border border-border bg-card hover:shadow-lg transition-all duration-300 animate-scale-in"
+                                  >
+                                    <div className="aspect-square relative">
+                                      <img
+                                        src={image}
+                                        alt={`Preview ${index + 1}`}
+                                        className="w-full h-full object-cover"
+                                      />
+                                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                                        <Button
+                                          type="button"
+                                          variant="destructive"
+                                          size="icon"
+                                          onClick={() => removeImage(index)}
+                                          className="hover-scale"
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                    <div className="absolute top-2 left-2 bg-background/80 backdrop-blur-sm px-2 py-1 rounded-md text-xs font-medium">
+                                      <ImageIcon className="h-3 w-3 inline mr-1" />
+                                      {index + 1}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
             </div>
 
             <div className="space-y-2">
@@ -359,9 +501,111 @@ export default function EditProduct() {
                 <Upload className="h-4 w-4 text-muted-foreground" />
               </div>
             </div>
+             {videoPreviews.length > 0 && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                              {videoPreviews.map((video, index) => (
+                                <div
+                                  key={index}
+                                  className="relative group rounded-lg overflow-hidden border border-border bg-card hover:shadow-lg transition-all duration-300 animate-scale-in"
+                                >
+                                  <div className="aspect-video relative">
+                                    <video
+                                      src={video}
+                                      controls
+                                      className="w-full h-full object-cover"
+                                    />
+                                    <div className="absolute top-2 right-2">
+                                      <Button
+                                        type="button"
+                                        variant="destructive"
+                                        size="icon"
+                                        onClick={() => removeVideo(index)}
+                                        className="hover-scale shadow-lg"
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  <div className="absolute bottom-2 left-2 bg-background/80 backdrop-blur-sm px-2 py-1 rounded-md text-xs font-medium">
+                                    <Video className="h-3 w-3 inline mr-1" />
+                                    Video {index + 1}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
           </CardContent>
         </Card>
+  <Card>
+          <CardHeader>
+            <CardTitle>Lab Reports</CardTitle>
+            <CardDescription>Upload product lab test reports and certifications</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {labReportFields.map((field, index) => (
+              <div key={field.id} className="space-y-4 p-4 border rounded-lg">
+                <div className="space-y-2">
+                  <Label htmlFor={`labReport-title-${index}`}>Report Title *</Label>
+                  <Input
+                    id={`labReport-title-${index}`}
+                    {...register(`labReports.${index}.title`)}
+                    placeholder="e.g., Third-Party Lab Test Certificate"
+                  />
+                </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor={`labReport-description-${index}`}>Description</Label>
+                  <Textarea
+                    id={`labReport-description-${index}`}
+                    {...register(`labReports.${index}.description`)}
+                    placeholder="Brief description of the lab report..."
+                    rows={2}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor={`labReport-file-${index}`}>Upload Report *</Label>
+                  <div className="flex items-center gap-4">
+                    <Input
+                      id={`labReport-file-${index}`}
+                      type="file"
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                      onChange={(e) => handleLabReportUpload(e, index)}
+                      className="flex-1"
+                    />
+                    <Button type="button" variant="outline" size="icon">
+                      <Upload className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {labReportPreviews[index] && (
+                    <p className="text-sm text-muted-foreground">
+                      Uploaded: {labReportPreviews[index].fileName}
+                    </p>
+                  )}
+                </div>
+
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => handleRemoveLabReport(index)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Remove Report
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => appendLabReport({ title: "", description: "", file: "" })}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Lab Report
+            </Button>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader>
             <CardTitle>About This Item</CardTitle>
