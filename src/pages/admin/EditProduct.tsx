@@ -155,6 +155,7 @@ useEffect(() => {
 const {token}=useAuth();
 
   const onSubmit = async (data: ProductForm) => {
+    debugger;
   setIsSubmitting(true);
   try {
     const payload = { ...data, aboutItem: aboutItemContent };
