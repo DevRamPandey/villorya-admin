@@ -136,8 +136,28 @@ useEffect(() => {
       const data = await res.json();
 
       if (data.success && data.product) {
-        reset(data.product);
-        setAboutItemContent(data.product.aboutItem || "");
+        const product = data.product;
+
+        // ✅ prefill form data
+        reset(product);
+
+        // ✅ show already uploaded content
+        setAboutItemContent(product.aboutItem || "");
+        setImagePreviews(product.images || []);
+        setVideoPreviews(product.videos || []);
+        setLabReportPreviews(
+          product.labReports?.map((r: any) => ({
+            title: r.title || "",
+            description: r.description || "",
+            file: r.file || "",
+            fileName: r.file?.split("/").pop() || "Existing file",
+          })) || []
+        );
+
+        // ✅ ensure form values are in sync
+        setValue("images", product.images || []);
+        setValue("videos", product.videos || []);
+        setValue("labReports", product.labReports || []);
       } else {
         toast.error(data.message || "Failed to load product");
       }
@@ -150,7 +170,8 @@ useEffect(() => {
   };
 
   fetchProduct();
-}, [id, reset]);
+}, [id, reset, setValue]);
+
 
 const {token}=useAuth();
 
@@ -579,10 +600,28 @@ const {token}=useAuth();
                     </Button>
                   </div>
                   {labReportPreviews[index] && (
-                    <p className="text-sm text-muted-foreground">
-                      Uploaded: {labReportPreviews[index].fileName}
-                    </p>
-                  )}
+  <div className="mt-2 space-y-2">
+    {/* Show media preview */}
+    {labReportPreviews[index].file && (
+      <>
+        {labReportPreviews[index].file.endsWith(".pdf") ? (
+          <iframe
+            src={labReportPreviews[index].file}
+            title={labReportPreviews[index].fileName}
+            className="w-full h-64 border rounded-md"
+          />
+        ) : (
+          <img
+            src={labReportPreviews[index].file}
+            alt={labReportPreviews[index].fileName}
+            className="w-48 h-48 object-cover border rounded-md"
+          />
+        )}
+      </>
+    )}
+  </div>
+)}
+
                 </div>
 
                 <Button

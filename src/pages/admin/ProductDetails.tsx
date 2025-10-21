@@ -50,6 +50,7 @@ export default function ProductDetails() {
   setIsLoading(true);
   try {
     const res = await fetch(`https://api.villorya.com/api/v1/product/${id}`);
+    debugger
     const data = await res.json();
 
     if (data.success) {
