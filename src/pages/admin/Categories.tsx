@@ -93,7 +93,7 @@ export default function Categories() {
     try {
       toast.loading("Uploading image...", { id: "upload" });
 
-      const res = await fetch("https://api.villorya.com/api/v1/product/upload", {
+      const res = await fetch("https://api.villorya.com/api/v1/category/upload", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
