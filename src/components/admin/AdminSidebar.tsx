@@ -15,6 +15,7 @@ import {
   ShoppingCart,
   FileEdit,
   Warehouse,
+  FolderTree,
 } from "lucide-react";
 import {
   Sidebar,
@@ -38,6 +39,11 @@ const menuItems = [
     title: "Products",
     icon: Box,
     url: "/admin/products",
+  },
+  {
+    title: "Categories",
+    icon: FolderTree,
+    url: "/admin/categories",
   },
   {
     title: "Package Suppliers",

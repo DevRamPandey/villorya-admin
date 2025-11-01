@@ -14,6 +14,7 @@ import Products from "./pages/admin/Products";
 import AddProduct from "./pages/admin/AddProduct";
 import EditProduct from "./pages/admin/EditProduct";
 import ProductDetails from "./pages/admin/ProductDetails";
+import Categories from "./pages/admin/Categories";
 import PackageSuppliers from "./pages/admin/PackageSuppliers";
 import RawSuppliers from "./pages/admin/RawSuppliers";
 import CMS from "./pages/admin/CMS";
@@ -46,6 +47,7 @@ const App = () => (
               <Route path="products/add" element={<AddProduct />} />
               <Route path="products/edit/:id" element={<EditProduct />} />
               <Route path="products/:id" element={<ProductDetails />} />
+              <Route path="categories" element={<Categories />} />
               <Route path="package-suppliers" element={<PackageSuppliers />} />
               <Route path="raw-suppliers" element={<RawSuppliers />} />
               <Route path="cms" element={<CMS />} />

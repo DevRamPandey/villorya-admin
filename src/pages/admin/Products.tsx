@@ -5,7 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Edit, Trash2, Eye } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Plus, Search, Edit, Trash2, Eye, Star } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -28,6 +30,7 @@ interface Product {
   netQuantities: { quantity: string; price: number }[];
   images: string[];
   useBy: string;
+  isFeatured?: boolean;
 }
 
 export default function Products() {
@@ -51,7 +54,40 @@ export default function Products() {
     setDeleteDialogOpen(true);
   };
 
-const confirmDelete = async () => {
+const toggleFeatured = async (productId: string, currentStatus: boolean) => {
+    try {
+      const res = await fetch(`https://api.villorya.com/api/v1/product/${productId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ isFeatured: !currentStatus }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setProducts(
+          products.map((p) =>
+            p._id === productId ? { ...p, isFeatured: !currentStatus } : p
+          )
+        );
+        toast.success(
+          !currentStatus
+            ? "Product marked as featured"
+            : "Product removed from featured"
+        );
+      } else {
+        toast.error(data.message || "Failed to update product");
+      }
+    } catch (error) {
+      console.error("Update error:", error);
+      toast.error("Something went wrong while updating product");
+    }
+  };
+
+  const confirmDelete = async () => {
     if (!productToDelete) return;
 
     try {
@@ -168,12 +204,19 @@ const confirmDelete = async () => {
                 />
               </div>
               <CardHeader>
-                <CardTitle className="line-clamp-2">{product.title}</CardTitle>
-                <CardDescription className="flex flex-wrap gap-2">
-                  <Badge variant="secondary">{product.variety}</Badge>
-                  <Badge variant="secondary">{product.itemForm}</Badge>
-                  <Badge variant="secondary">{product.dietType}</Badge>
-                </CardDescription>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <CardTitle className="line-clamp-2">{product.title}</CardTitle>
+                    <CardDescription className="flex flex-wrap gap-2 mt-2">
+                      <Badge variant="secondary">{product.variety}</Badge>
+                      <Badge variant="secondary">{product.itemForm}</Badge>
+                      <Badge variant="secondary">{product.dietType}</Badge>
+                    </CardDescription>
+                  </div>
+                  {product.isFeatured && (
+                    <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex flex-wrap gap-2">
@@ -182,6 +225,18 @@ const confirmDelete = async () => {
                       {nq.quantity}: ₹{nq.price}
                     </Badge>
                   ))}
+                </div>
+                <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+                  <Switch
+                    id={`featured-${product._id}`}
+                    checked={product.isFeatured || false}
+                    onCheckedChange={() =>
+                      toggleFeatured(product._id, product.isFeatured || false)
+                    }
+                  />
+                  <Label htmlFor={`featured-${product._id}`} className="text-sm cursor-pointer">
+                    Featured Product
+                  </Label>
                 </div>
                 <div className="flex gap-2">
                   <Button
